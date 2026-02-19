@@ -4,7 +4,7 @@
 			"path": "."
 		},
 		{
-			"path": "../../quick-start-template"
+			"path": "../../caseload-forecast-demo"
 		}
 	],
 	"settings": {}
