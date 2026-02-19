@@ -4,6 +4,12 @@ AI system status and technical briefings.
 
 ---
 
+# 2026-02-19
+
+Built complete CCHS data pipeline: `manipulation/1-ferry.R` (zero-transform .sav → SQLite), `manipulation/2-ellis.R` (white-list + harmonize + factor recode + pool weights → Parquet primary + SQLite secondary), `manipulation/2-test-ellis-cache.R` (5-section alignment test), updated `flow.R` Phase 1, populated `INPUT-manifest.md`, created `manipulation/pipeline.md`. Two-tier white-list: 13 CONFIRMED vars (hard error) + ~60 INFERRED vars (warn+drop). Survey-weight pooling: `wts_m / 2`. See `ai/memory/log/2026-02-19-cchs-pipeline.md`.
+
+---
+
 # 2025-11-08
 
 System successfully updated to use config-driven memory paths 

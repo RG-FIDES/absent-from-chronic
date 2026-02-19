@@ -118,14 +118,11 @@ ds_rail  <- tibble::tribble(
   ~fx         , ~path,
 
   # ===============================
-  # PHASE 1: DATA IMPORT & PREPARATION  
+  # PHASE 1: DATA MANIPULATION
   # ===============================
-  
-  # Main ETL (Extract-Transform-Load) from Google Sheets to local formats
-  # "run_r"     , "manipulation/0-ellis.R",              # Core data import and prep - creates long and wide format datasets
-  # "run_r"     , "manipulation/1-ellis-ua-admin.R",              # Enhance geography data with bookstore infrastructure - creates enhanced datasets
-  # "run_r"     , "manipulation/2-ellis-extra.R",              # Adding extra custom data in future developments
-  # "run_r"     , "manipulation/last-ellis.R",              
+
+  "run_r"     , "manipulation/1-ferry.R",              # Ferry: CCHS .sav files → cchs-1.sqlite (zero transformation)
+  "run_r"     , "manipulation/2-ellis.R",              # Ellis: white-list + recode → cchs-2.sqlite + Parquet              
   
   # ===============================
   # PHASE 2: ANALYSIS SCRIPTS
