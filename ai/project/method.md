@@ -1,6 +1,13 @@
-# Methodology (Template)
+# Methodology 
 
-Describe the analytical approach, standards, and reproducibility guardrails for this project.
+## Input instructions
+
+- `data-private\raw\2026-02-19\stats_instructions_v3.md`
+
+## Data Sources
+
+- `data-private\raw\2026-02-19\CCHS_2014_EN_PUMF.sav` - 2014 wave
+- `data-private\raw\2026-02-19\CCHS2010_LOP.sav` - 2011 wave
 
 ## Analytical Approach
 
