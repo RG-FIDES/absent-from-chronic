@@ -125,3 +125,12 @@ analysis/*/*/*/*.html
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/settings.json.example
+
+# -------- renv files ---------
+
+!*renv.lock
+!*renv/library/
+!*.Rprofile
+!*renv/activate.R
+!*renv/settings.json
+
