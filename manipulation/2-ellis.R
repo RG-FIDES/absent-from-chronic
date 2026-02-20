@@ -66,23 +66,31 @@ requireNamespace("arrow")
 requireNamespace("fs")
 
 # ---- load-sources ------------------------------------------------------------
-base::source("./scripts/common-functions.R")
+project_root <- if (dir.exists("scripts") && dir.exists("manipulation")) {
+  "."
+} else if (dir.exists("../scripts") && dir.exists("../manipulation")) {
+  ".."
+} else {
+  stop("Cannot locate project root. Run from project root or from manipulation/.")
+}
+
+base::source(file.path(project_root, "scripts", "common-functions.R"))
 
 # ---- declare-globals ---------------------------------------------------------
 
 # Input (ferry output)
-input_sqlite  <- "./data-private/derived/cchs-1.sqlite"
+input_sqlite  <- file.path(project_root, "data-private", "derived", "cchs-1.sqlite")
 table_2010    <- "cchs_2010_raw"
 table_2014    <- "cchs_2014_raw"
 
 # Output — SQLite (secondary: ad-hoc SQL exploration; factors as character)
-output_sqlite <- "./data-private/derived/cchs-2.sqlite"
+output_sqlite <- file.path(project_root, "data-private", "derived", "cchs-2.sqlite")
 output_dir    <- dirname(output_sqlite)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Output — Parquet (primary: preserves R factor types, levels, and order)
-output_parquet_dir <- "./data-private/derived/cchs-2-tables/"
-if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recursive = TRUE)
+output_parquet_dir <- file.path(project_root, "data-private", "derived", "cchs-2-tables")
+if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recurse = TRUE)
 
 # --------------------------------------------------------------------------
 # WHITE-LIST: Variables selected for the analytical dataset
@@ -267,6 +275,38 @@ select_whitelist <- function(data, confirmed, inferred, bootstrap_pat,
   data[, keep_cols, drop = FALSE]
 }
 
+# Harmonize known cross-cycle alias names to canonical white-list names.
+# If canonical is missing and an alias exists, copy alias into canonical.
+harmonize_aliases <- function(data, alias_map, cycle_label = "") {
+  for (canonical in names(alias_map)) {
+    if (canonical %in% names(data)) next
+
+    aliases <- alias_map[[canonical]]
+    found <- intersect(aliases, names(data))
+    if (length(found) > 0) {
+      data[[canonical]] <- data[[found[1]]]
+      cat(sprintf("  [%s] harmonized alias: %s <- %s\n",
+                  cycle_label, canonical, found[1]))
+    }
+  }
+  data
+}
+
+# Ensure columns exist before recoding; add as NA when absent.
+ensure_columns <- function(data, cols, context_label = "") {
+  missing_cols <- setdiff(cols, names(data))
+  if (length(missing_cols) > 0) {
+    for (col in missing_cols) {
+      data[[col]] <- NA
+    }
+    warning(sprintf(
+      "[%s] Added %d missing column(s) as NA for downstream compatibility: %s",
+      context_label, length(missing_cols), paste(missing_cols, collapse = ", ")
+    ))
+  }
+  data
+}
+
 # Safely recode a numeric vector into a factor.
 # Returns NA (with a warning) for any values not in the code map.
 safe_recode_factor <- function(x, code_map, ordered = FALSE) {
@@ -296,6 +336,21 @@ cnn <- DBI::dbConnect(RSQLite::SQLite(), input_sqlite)
 ds_2010_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2010))
 ds_2014_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2014))
 DBI::dbDisconnect(cnn)
+
+# Harmonize known alias names before white-list selection.
+alias_map <- list(
+  edudh04  = c("edudr04"),
+  sdcdgcb  = c("sdcgcgt"),
+  geodgprv = c("geogprv"),
+  hcu_1aa  = c("hcu_1a", "hcudgmd"),
+  lbfdghp  = c("lbsg031", "lbs_g31"),
+  gen_02a  = c("gen_02", "gen_02a2"),
+  gen_09   = c("gen_03"),
+  inj_01   = c("injdgyrs")
+)
+
+ds_2010_raw <- harmonize_aliases(ds_2010_raw, alias_map, cycle_label = "CCHS2010")
+ds_2014_raw <- harmonize_aliases(ds_2014_raw, alias_map, cycle_label = "CCHS2014")
 
 cat(sprintf("📥 Loaded CCHS 2010-2011: %s rows, %s columns\n",
             format(nrow(ds_2010_raw), big.mark = ","),
@@ -385,7 +440,8 @@ cat("\n🔧 Step 1: Construct outcome variables\n")
 #
 # Primary outcome: days_absent_total
 #   Sum of all 8 LOP reason variables. NA treated as 0 when at least one
-#   non-NA value exists across the 8 components; TRUE NA only when ALL are NA.
+#   non-NA value exists across the 8 components. When ALL are NA, treat as 0
+#   (no reported absence reasons) to preserve structural zeros.
 #
 # Sensitivity outcome: days_absent_chronic
 #   Single variable lopg040 (days lost due to chronic condition only).
@@ -403,13 +459,27 @@ ds1 <- ds0 %>%
       across(all_of(lop_vars), ~ as.numeric(.x)),
       na.rm = TRUE
     ),
-    # Flag respondents where ALL 8 LOP components are NA (truly missing outcome)
+    # Flag respondents where ALL 8 LOP components are NA.
+    # In CCHS skip-patterns this generally indicates no absences (structural zero).
     outcome_all_na = rowSums(is.na(across(all_of(lop_vars)))) == length(lop_vars),
-    days_absent_total = if_else(outcome_all_na, NA_real_, days_absent_total),
+    days_absent_total = if_else(outcome_all_na, 0, days_absent_total),
 
     # Sensitivity outcome: chronic condition days only
     days_absent_chronic = as.numeric(lopg040)
   )
+
+# Enforce valid range for primary outcome (0-90 days).
+# Values outside this range are treated as data quality issues and set to NA.
+invalid_total <- !is.na(ds1$days_absent_total) &
+  (ds1$days_absent_total < 0 | ds1$days_absent_total > 90)
+n_invalid_total <- sum(invalid_total)
+if (n_invalid_total > 0) {
+  warning(sprintf(
+    "%d respondents have days_absent_total outside 0-90 and were set to NA",
+    n_invalid_total
+  ))
+  ds1$days_absent_total[invalid_total] <- NA_real_
+}
 
 cat(sprintf("   ✓ days_absent_total range: %g – %g (n non-NA: %s)\n",
             min(ds1$days_absent_total, na.rm = TRUE),
@@ -419,12 +489,6 @@ cat(sprintf("   ✓ days_absent_chronic range: %g – %g (n non-NA: %s)\n",
             min(ds1$days_absent_chronic, na.rm = TRUE),
             max(ds1$days_absent_chronic, na.rm = TRUE),
             format(sum(!is.na(ds1$days_absent_chronic)), big.mark = ",")))
-
-# Flag if any total > 90 days (stats_instructions_v3 specifies max = 90)
-n_over90 <- sum(ds1$days_absent_total > 90, na.rm = TRUE)
-if (n_over90 > 0) {
-  warning(sprintf("%d respondents have days_absent_total > 90 — verify against data dictionary", n_over90))
-}
 
 # ---- tweak-data-2-exclusions -------------------------------------------------
 cat("\n🔧 Step 2: Apply sequential sample exclusions (Section 3.1)\n")
@@ -553,6 +617,16 @@ cat("\n🔧 Step 3: Factor recoding\n")
 #   8=Refusal, 9=Not stated are mapped to NA throughout.
 
 special_na_codes <- c(6, 7, 8, 9, 96, 97, 98, 99)
+
+# Inferred recode source variables may be absent in one/both cycles.
+# Ensure they exist as NA columns so mutate()/case_when() never fails.
+recode_source_vars <- c(
+  "dhhgage", "dhh_sex", "dhhgms", "edudh04", "sdcfimm", "sdcdgcb",
+  "incdghh", "hcu_1aa", "lbfdghp", "lbfdgft", "alcdgtyp", "smkdsty",
+  "hwtdgbmi", "pacdpai", "gen_01", "gen_02a", "gen_09", "rac_1", "inj_01"
+)
+
+ds2 <- ensure_columns(ds2, recode_source_vars, context_label = "factor recoding inputs")
 
 ds3 <- ds2 %>%
   mutate(
