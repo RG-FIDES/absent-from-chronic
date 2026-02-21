@@ -79,7 +79,13 @@ base::source(file.path(project_root, "scripts", "common-functions.R"))
 # ---- declare-globals ---------------------------------------------------------
 
 # Input (ferry output)
-input_sqlite  <- file.path(project_root, "data-private", "derived", "cchs-1.sqlite")
+input_sqlite_candidates <- unique(c(
+  file.path(project_root, "data-private", "derived", "cchs-1.sqlite"),
+  file.path(".", "data-private", "derived", "cchs-1.sqlite"),
+  file.path("..", "data-private", "derived", "cchs-1.sqlite")
+))
+input_sqlite <- input_sqlite_candidates[file.exists(input_sqlite_candidates)][1]
+if (is.na(input_sqlite)) input_sqlite <- input_sqlite_candidates[1]
 table_2010    <- "cchs_2010_raw"
 table_2014    <- "cchs_2014_raw"
 
@@ -329,7 +335,8 @@ cat(strrep("=", 70), "\n")
 
 if (!file.exists(input_sqlite)) {
   stop("Ferry output not found: ", input_sqlite,
-       "\nRun manipulation/1-ferry.R first.")
+  "\nSearched: ", paste(input_sqlite_candidates, collapse = "; "),
+  "\nRun manipulation/1-ferry.R first.")
 }
 
 cnn <- DBI::dbConnect(RSQLite::SQLite(), input_sqlite)
