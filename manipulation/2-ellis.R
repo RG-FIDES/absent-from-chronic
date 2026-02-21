@@ -89,6 +89,11 @@ if (is.na(input_sqlite)) input_sqlite <- input_sqlite_candidates[1]
 table_2010    <- "cchs_2010_raw"
 table_2014    <- "cchs_2014_raw"
 
+# Cycle integrity mode:
+#   TRUE  = stop if any cycle is empty (strict pooled analysis mode)
+#   FALSE = continue with available cycle(s), emit warnings (debug/single-cycle mode)
+strict_cycle_integrity <- FALSE
+
 # Output — SQLite (secondary: ad-hoc SQL exploration; factors as character)
 output_sqlite <- file.path(project_root, "data-private", "derived", "cchs-2.sqlite")
 output_dir    <- dirname(output_sqlite)
@@ -344,6 +349,43 @@ ds_2010_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2010))
 ds_2014_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2014))
 DBI::dbDisconnect(cnn)
 
+# Input guardrails for cycle availability
+if (nrow(ds_2010_raw) == 0L && nrow(ds_2014_raw) == 0L) {
+  stop(
+    sprintf(
+      paste0(
+        "Both ferry input tables are empty in %s.\\n",
+        "- %s rows: %s\\n",
+        "- %s rows: %s\\n",
+        "Cannot proceed: run 1-ferry.R with valid raw inputs."
+      ),
+      input_sqlite,
+      table_2010, format(nrow(ds_2010_raw), big.mark = ","),
+      table_2014, format(nrow(ds_2014_raw), big.mark = ",")
+    )
+  )
+}
+
+if (nrow(ds_2010_raw) == 0L || nrow(ds_2014_raw) == 0L) {
+  msg <- sprintf(
+    paste0(
+      "One ferry input table is empty in %s.\\n",
+      "- %s rows: %s\\n",
+      "- %s rows: %s\\n",
+      "Likely cause: missing raw .sav file or failed ingest in 1-ferry.R."
+    ),
+    input_sqlite,
+    table_2010, format(nrow(ds_2010_raw), big.mark = ","),
+    table_2014, format(nrow(ds_2014_raw), big.mark = ",")
+  )
+
+  if (strict_cycle_integrity) {
+    stop(msg, "\\nstrict_cycle_integrity=TRUE: stopping.")
+  } else {
+    warning(msg, "\\nContinuing with available cycle(s) because strict_cycle_integrity=FALSE.")
+  }
+}
+
 # Harmonize known alias names before white-list selection.
 alias_map <- list(
   edudh04  = c("edudr04"),
@@ -433,6 +475,18 @@ cat(sprintf("  ✓ Pooled (both cycles): %s rows, %s columns\n",
             format(ncol(ds0), big.mark = ",")))
 cat(sprintf("  ✓ CCHS 2010-2011: %s rows\n", format(sum(ds0$cycle == 0L), big.mark = ",")))
 cat(sprintf("  ✓ CCHS 2013-2014: %s rows\n", format(sum(ds0$cycle == 1L), big.mark = ",")))
+
+if (sum(ds0$cycle == 0L, na.rm = TRUE) == 0L || sum(ds0$cycle == 1L, na.rm = TRUE) == 0L) {
+  msg <- paste0(
+    "Cycle integrity check before transformations: one cycle has 0 rows in pooled ds0.\n",
+    "Inspect white-list/alias mappings and upstream ferry input tables."
+  )
+  if (strict_cycle_integrity) {
+    stop(msg)
+  } else {
+    warning(msg)
+  }
+}
 
 # ==============================================================================
 # SECTION 2: ELLIS TRANSFORMATIONS
@@ -567,6 +621,23 @@ cat(sprintf("   ✓ After proxy exclusion:     %s  (-%s excluded)\n",
 cat(sprintf("   ✓ After complete outcome:    %s  (-%s excluded)\n",
             format(n_step["n_after_complete_outcome"], big.mark = ","),
             format(n_step["n_after_proxy"] - n_step["n_after_complete_outcome"], big.mark = ",")))
+
+cat("\n   Cycle counts after exclusions:\n")
+print(ds2 %>%
+        count(cycle, name = "n") %>%
+        arrange(cycle))
+
+if (sum(ds2$cycle == 0L, na.rm = TRUE) == 0L || sum(ds2$cycle == 1L, na.rm = TRUE) == 0L) {
+  msg <- paste0(
+    "Cycle integrity check after exclusions: one cycle has 0 rows.\n",
+    "Verify variable coding consistency across cycles (especially dhhgage, lop_015, adm_prx, LOP outcomes)."
+  )
+  if (strict_cycle_integrity) {
+    stop(msg)
+  } else {
+    warning(msg)
+  }
+}
 
 # Reference from prior analysis: n_final should be approximately 64,141
 n_final <- nrow(ds2)
