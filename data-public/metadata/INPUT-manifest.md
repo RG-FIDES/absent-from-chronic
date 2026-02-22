@@ -1,7 +1,7 @@
 # INPUT Manifest
 
 Describes the raw input datasets consumed by the data pipeline **before** Ferry/Ellis processing.  
-Updated: 2026-02-19
+Updated: 2026-02-22
 
 ---
 
@@ -56,6 +56,10 @@ The Ferry lane (`1-ferry.R`) imports **all columns** from both files with zero s
 
 The Ellis lane (`2-ellis.R`) applies a **white-list** selecting only variables relevant to the
 work-absenteeism analysis. White-listed variables fall into two tiers:
+
+Current Lane 2 sample mode:
+- Default: **full pooled sample retained** (`apply_sample_exclusions = FALSE`)
+- Optional legacy mode: sequential exclusions enabled (`apply_sample_exclusions = TRUE`)
 
 ### Tier 1: CONFIRMED (error if missing)
 Variables verified against the PDF data dictionaries and the study's
@@ -124,6 +128,18 @@ CCHS_2014_EN_PUMF.sav     ──┘              └──► cchs-1-raw/*.parqu
                                    cchs-2.sqlite             cchs-2-tables/
                                   (cchs_analytical,          cchs_analytical.parquet
                                    sample_flow)              sample_flow.parquet
+                                                      │
+                                                      ▼
+                                             3-ellis.R (clarity + splits)
+                                                      │
+                                            ┌─────────┴────────────┐
+                                            ▼                       ▼
+                                   cchs-3.sqlite             cchs-3-tables/
+                                  (cchs_analytical,          cchs_analytical.parquet
+                                   cchs_employed,            cchs_employed.parquet
+                                   cchs_unemployed,          cchs_unemployed.parquet
+                                   sample_flow,              sample_flow.parquet
+                                   data_dictionary)          data_dictionary.parquet
 ```
 
 ---

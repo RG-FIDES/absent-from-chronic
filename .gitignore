@@ -133,4 +133,5 @@ analysis/*/*/*/*.html
 !*.Rprofile
 !*renv/activate.R
 !*renv/settings.json
-
+# --- Dictionary files ---
+*-dictionary*.md
