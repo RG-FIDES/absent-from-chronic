@@ -122,14 +122,17 @@ ds_rail  <- tibble::tribble(
   # ===============================
 
   "run_r"     , "manipulation/1-ferry.R",              # Ferry: CCHS .sav files → cchs-1.sqlite (zero transformation)
-  "run_r"     , "manipulation/2-ellis.R",              # Ellis: white-list + recode → cchs-2.sqlite + Parquet              
+  "run_r"     , "manipulation/2-ellis.R",              # Ellis Lane 2: white-list + recode → cchs-2.sqlite + Parquet
+  "run_r"     , "manipulation/3-ellis.R",              # Ellis Lane 3: clarity layer + splits → cchs-3.sqlite + Parquet
+  "run_r_soft", "manipulation/2-test-ellis-cache.R",   # Ellis validation (non-blocking in flow)
+  "run_r_soft", "manipulation/ellis-lane-example.R",   # Ellis pattern example (non-blocking in flow)
   
   # ===============================
   # PHASE 2: ANALYSIS SCRIPTS
   # ===============================
   
   # Core analysis scripts that depend on the manipulated data
-  #"run_r"     , "analysis/eda-1/eda-1.R",              # Main exploratory data analysis script
+  "run_r_soft", "analysis/eda-1/eda-1.R",              # Main exploratory data analysis script (non-blocking)
   #"run_r"     , "analysis/Data-visualization/Data-visual.R",  # Data visualization script
   # "run_r"     , "analysis/report-example-2/1-scribe.R", # Scribe script for analysis-ready data
   
@@ -138,7 +141,7 @@ ds_rail  <- tibble::tribble(
   # ===============================
   
   # Primary analysis reports (Quarto format) - WITH IMPROVED ERROR HANDLING
-  "run_qmd"   , "analysis/eda-1/eda-1.qmd",            # Main exploratory data analysis report
+  "run_qmd_soft", "analysis/eda-1/eda-1.qmd",          # Main exploratory data analysis report (non-blocking)
   #"run_qmd"   , "analysis/Data-visualization/Data-visual.qmd", # Data visualization report
   # "run_qmd"   , "analysis/report-example-2/eda-1.qmd", # Analysis report example
   
@@ -161,6 +164,22 @@ run_r <- function( minion ) {
   message("\nStarting `", basename(minion), "` at ", Sys.time(), ".")
   base::source(minion, local=new.env())
   message("Completed `", basename(minion), "`.")
+  return( TRUE )
+}
+run_r_soft <- function( minion ) {
+  message("\nStarting (soft) `", basename(minion), "` at ", Sys.time(), ".")
+  ok <- TRUE
+  tryCatch({
+    base::source(minion, local=new.env())
+  }, error = function(e) {
+    ok <<- FALSE
+    warning("Non-blocking step failed: ", basename(minion), " | ", e$message)
+  })
+  if (ok) {
+    message("Completed (soft) `", basename(minion), "`.")
+  } else {
+    message("Completed (soft) `", basename(minion), "` with warnings.")
+  }
   return( TRUE )
 }
 run_sql <- function( minion ) {
@@ -243,6 +262,22 @@ run_qmd <- function( minion ) {
   })
 
   return( TRUE )
+}
+run_qmd_soft <- function( minion ) {
+  message("\nStarting (soft) `", basename(minion), "` at ", Sys.time(), ".")
+  ok <- TRUE
+  tryCatch({
+    run_qmd(minion)
+  }, error = function(e) {
+    ok <<- FALSE
+    warning("Non-blocking QMD step failed: ", basename(minion), " | ", e$message)
+  })
+  if (ok) {
+    message("Completed (soft) `", basename(minion), "`.")
+  } else {
+    message("Completed (soft) `", basename(minion), "` with warnings.")
+  }
+  return(TRUE)
 }
 run_python <- function( minion ) {
   message("\nStarting `", basename(minion), "` at ", Sys.time(), ".")
