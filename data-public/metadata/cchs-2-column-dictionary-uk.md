@@ -86,14 +86,15 @@
 
 | Колонка                | Позначка         |
 |------------------------|------------------|
-| lop_015                | usesless         |
-| adm_prx                | all 2, usesless  |
-| adm_rno                | usesless         |
-| income_5cat            | all null         |
-| employment_type        | all null         |
-| work_schedule          | all null         |
-| alcohol_type           | all null         |
-| bmi_category           | all null         |
+| lop_015                | usesless         | - usefull
+| adm_prx                | all 2, usesless  | - usefull
+| adm_rno                | usesless         | - usesless
+| income_5cat            | all null         |- usesless
+| employment_type        | all null         |- usesless
+| work_schedule          | all null         |- usesless
+| alcohol_type           | all null         |- usesless
+| bmi_category           | all null         |- usesless
+dhhgage
 
 > Автоматично згенеровано для технічної звітності. Колонки з цими позначками не використовуються у фінальному аналізі або містять лише пропущені значення.
 - Для повного двоциклового аналізу потрібно завантажити 2014 PUMF `.sav` і перезапустити `1-ferry.R` → `2-ellis.R`.

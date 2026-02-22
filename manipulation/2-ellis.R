@@ -94,6 +94,11 @@ table_2014    <- "cchs_2014_raw"
 #   FALSE = continue with available cycle(s), emit warnings (debug/single-cycle mode)
 strict_cycle_integrity <- FALSE
 
+# Sample filtering mode:
+#   FALSE = keep full pooled sample (default; includes employed + unemployed)
+#   TRUE  = apply legacy exclusions from stats_instructions_v3 Section 3.1
+apply_sample_exclusions <- FALSE
+
 # Output — SQLite (secondary: ad-hoc SQL exploration; factors as character)
 output_sqlite <- file.path(project_root, "data-private", "derived", "cchs-2.sqlite")
 output_dir    <- dirname(output_sqlite)
@@ -552,13 +557,16 @@ cat(sprintf("   ✓ days_absent_chronic range: %g – %g (n non-NA: %s)\n",
             format(sum(!is.na(ds1$days_absent_chronic)), big.mark = ",")))
 
 # ---- tweak-data-2-exclusions -------------------------------------------------
-cat("\n🔧 Step 2: Apply sequential sample exclusions (Section 3.1)\n")
+cat("\n🔧 Step 2: Sample inclusion mode\n")
 #
-# Exclusion criteria (in order per stats_instructions_v3 Section 3.1):
+# If apply_sample_exclusions=TRUE, apply legacy exclusions (Section 3.1):
 #   1. Age outside 15-75 (dhhgage)
 #   2. Not employed in past 3 months (lop_015 != 1)
 #   3. Proxy respondent (adm_prx == 1)
 #   4. Incomplete outcome or predictor data
+#
+# If apply_sample_exclusions=FALSE (default), retain full pooled sample
+# from ferry output (employed + unemployed + not stated), after white-listing.
 #
 # CCHS DHHGAGE codes (VERIFY against data dictionary):
 #   1=12-14yrs, 2=15-17yrs, 3=18-19yrs, 4=20-24yrs, 5=25-29yrs, 6=30-34yrs,
@@ -582,45 +590,66 @@ predictor_cols <- setdiff(
 n_step <- integer(0)
 n_step["n_start"] <- nrow(ds1)
 
-# Apply sequential filters, tracking counts
-ds2 <- ds1
+# Apply sequential filters only when explicitly requested
+if (isTRUE(apply_sample_exclusions)) {
+  cat("   Mode: legacy exclusions enabled (employment filter applied)\n")
 
-# Step 1: Age 15–75
-# dhhgage codes 2–14 correspond to ages 15–74 (code 15 = 75-79, which includes 75)
-# ADJUST if actual codes differ
-in_age_range <- ds2$dhhgage %in% 2:15   # codes 2=15-17 through 15=75-79
-n_step["n_after_age"] <- sum(in_age_range, na.rm = TRUE)
-ds2 <- ds2 %>% filter(dhhgage %in% 2:15)
+  ds2 <- ds1
 
-# Step 2: Employed in past 3 months
-in_employed <- ds2$lop_015 == 1
-n_step["n_after_employment"] <- sum(in_employed, na.rm = TRUE)
-ds2 <- ds2 %>% filter(lop_015 == 1)
+  # Step 1: Age 15–75
+  # dhhgage codes 2–14 correspond to ages 15–74 (code 15 = 75-79, which includes 75)
+  # ADJUST if actual codes differ
+  in_age_range <- ds2$dhhgage %in% 2:15   # codes 2=15-17 through 15=75-79
+  n_step["n_after_age"] <- sum(in_age_range, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(dhhgage %in% 2:15)
 
-# Step 3: Exclude proxy respondents
-not_proxy <- ds2$adm_prx != 1 | is.na(ds2$adm_prx)
-n_step["n_after_proxy"] <- sum(not_proxy, na.rm = TRUE)
-ds2 <- ds2 %>% filter(adm_prx != 1 | is.na(adm_prx))
+  # Step 2: Employed in past 3 months
+  in_employed <- ds2$lop_015 == 1
+  n_step["n_after_employment"] <- sum(in_employed, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(lop_015 == 1)
 
-# Step 4: Complete outcome (days_absent_total must be non-NA)
-# Additional predictor completeness handled in analysis phase (see missingness section)
-complete_outcome <- !is.na(ds2$days_absent_total)
-n_step["n_after_complete_outcome"] <- sum(complete_outcome, na.rm = TRUE)
-ds2 <- ds2 %>% filter(!is.na(days_absent_total))
+  # Step 3: Exclude proxy respondents
+  not_proxy <- ds2$adm_prx != 1 | is.na(ds2$adm_prx)
+  n_step["n_after_proxy"] <- sum(not_proxy, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(adm_prx != 1 | is.na(adm_prx))
 
-cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
-cat(sprintf("   ✓ After age 15-75:           %s  (-%s excluded)\n",
-            format(n_step["n_after_age"], big.mark = ","),
-            format(n_step["n_start"] - n_step["n_after_age"], big.mark = ",")))
-cat(sprintf("   ✓ After employed filter:     %s  (-%s excluded)\n",
-            format(n_step["n_after_employment"], big.mark = ","),
-            format(n_step["n_after_age"] - n_step["n_after_employment"], big.mark = ",")))
-cat(sprintf("   ✓ After proxy exclusion:     %s  (-%s excluded)\n",
-            format(n_step["n_after_proxy"], big.mark = ","),
-            format(n_step["n_after_employment"] - n_step["n_after_proxy"], big.mark = ",")))
-cat(sprintf("   ✓ After complete outcome:    %s  (-%s excluded)\n",
-            format(n_step["n_after_complete_outcome"], big.mark = ","),
-            format(n_step["n_after_proxy"] - n_step["n_after_complete_outcome"], big.mark = ",")))
+  # Step 4: Complete outcome (days_absent_total must be non-NA)
+  # Additional predictor completeness handled in analysis phase (see missingness section)
+  complete_outcome <- !is.na(ds2$days_absent_total)
+  n_step["n_after_complete_outcome"] <- sum(complete_outcome, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(!is.na(days_absent_total))
+
+  cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
+  cat(sprintf("   ✓ After age 15-75:           %s  (-%s excluded)\n",
+              format(n_step["n_after_age"], big.mark = ","),
+              format(n_step["n_start"] - n_step["n_after_age"], big.mark = ",")))
+  cat(sprintf("   ✓ After employed filter:     %s  (-%s excluded)\n",
+              format(n_step["n_after_employment"], big.mark = ","),
+              format(n_step["n_after_age"] - n_step["n_after_employment"], big.mark = ",")))
+  cat(sprintf("   ✓ After proxy exclusion:     %s  (-%s excluded)\n",
+              format(n_step["n_after_proxy"], big.mark = ","),
+              format(n_step["n_after_employment"] - n_step["n_after_proxy"], big.mark = ",")))
+  cat(sprintf("   ✓ After complete outcome:    %s  (-%s excluded)\n",
+              format(n_step["n_after_complete_outcome"], big.mark = ","),
+              format(n_step["n_after_proxy"] - n_step["n_after_complete_outcome"], big.mark = ",")))
+} else {
+  cat("   Mode: full pooled sample (no exclusions applied)\n")
+
+  ds2 <- ds1
+  n_step["n_after_age"] <- n_step["n_start"]
+  n_step["n_after_employment"] <- n_step["n_start"]
+  n_step["n_after_proxy"] <- n_step["n_start"]
+  n_step["n_after_complete_outcome"] <- n_step["n_start"]
+
+  cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
+  cat(sprintf("   ✓ Full pooled retained:      %s  (-0 excluded)\n",
+              format(n_step["n_after_complete_outcome"], big.mark = ",")))
+
+  cat("\n   Employment distribution retained (lop_015):\n")
+  print(ds2 %>%
+          count(lop_015, name = "n") %>%
+          arrange(lop_015))
+}
 
 cat("\n   Cycle counts after exclusions:\n")
 print(ds2 %>%
@@ -639,15 +668,18 @@ if (sum(ds2$cycle == 0L, na.rm = TRUE) == 0L || sum(ds2$cycle == 1L, na.rm = TRU
   }
 }
 
-# Reference from prior analysis: n_final should be approximately 64,141
 n_final <- nrow(ds2)
 cat(sprintf("\n   Final analytical sample: %s\n", format(n_final, big.mark = ",")))
-cat(sprintf("   Reference (prior analysis): 64,141\n"))
-if (abs(n_final - 64141) > 5000) {
-  warning(sprintf(
-    "Final sample size (%d) differs from reference (64,141) by >5,000.\nVerify exclusion variable codes against data dictionaries.",
-    n_final
-  ))
+if (isTRUE(apply_sample_exclusions)) {
+  cat(sprintf("   Reference (legacy exclusions): 64,141\n"))
+  if (abs(n_final - 64141) > 5000) {
+    warning(sprintf(
+      "Final sample size (%d) differs from reference (64,141) by >5,000.\nVerify exclusion variable codes against data dictionaries.",
+      n_final
+    ))
+  }
+} else {
+  cat(sprintf("   Reference mode: full pooled sample from ferry output (employment not filtered)\n"))
 }
 
 # Build sample_flow table (for reproducing Figure 1 flowchart)
@@ -661,10 +693,10 @@ sample_flow <- tibble::tibble(
   ),
   description = c(
     "Starting pool (both CCHS cycles pooled)",
-    "Exclude respondents outside age 15-75",
-    "Exclude respondents not employed (past 3 months)",
-    "Exclude proxy respondents",
-    "Exclude respondents with missing outcome (days absent)"
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents outside age 15-75" else "No exclusion applied (full pooled sample mode)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents not employed (past 3 months)" else "No exclusion applied (employment retained)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude proxy respondents" else "No exclusion applied (proxy retained)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents with missing outcome (days absent)" else "No exclusion applied (outcome missingness retained)"
   ),
   n_remaining = as.integer(n_step),
   n_excluded  = as.integer(c(
@@ -1290,8 +1322,8 @@ cat("   1. Review white-list miss warnings above (if any)\n")
 cat("      → Open PDF data dictionaries in ./data-private/raw/2026-02-19/\n")
 cat("      → Update INFERRED variable names in declare-globals section\n")
 cat("   2. Confirm DHHGAGE age codes match your data dictionary (currently 2-15)\n")
-cat("   3. Confirm LOP_015 employment code (currently: 1=Yes employed)\n")
-cat("   4. Confirm ADM_PRX proxy code (currently: 1=Proxy → exclude)\n")
+cat("   3. Confirm LOP_015 employment coding (retained as raw; no employment exclusion in default mode)\n")
+cat("   4. Confirm ADM_PRX proxy coding (retained as raw; proxy exclusion only when apply_sample_exclusions=TRUE)\n")
 cat("   5. Verify CCC variable names match the 19 conditions in thesis Appendix 3\n")
 cat("   6. Check outcome distribution vs reference (mean≈1.35, 70.59% zeros)\n")
 
