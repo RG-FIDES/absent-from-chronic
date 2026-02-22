@@ -1,0 +1,246 @@
+---
+title: "Work Absence Among Employed Canadians"
+subtitle: "EDA 2 — CCHS 2010-11 & 2013-14: Days Missed by Employed Respondents"
+author: "Analysis Team"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    code-fold: show
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: true
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Mission
+
+> **TODO**: Replace this section with the analytical mission for EDA-2.
+
+Describe:
+
+-   **Dataset**: What data are you analysing and where does it come from?
+-   **Research Questions**: What are you trying to learn?
+-   **Data Lineage**: What derived datasets will be created (e.g. `ds0 → g2_data → ...`)?
+-   **Scope**: What is in and out of scope for this EDA?
+
+# Definition of Terms
+
+```{r}
+#| code-summary: Reconciles working directory between execution modes
+#| echo: false
+#| results: hide
+#| message: false 
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = '../../') # keep this chunk isolated
+```
+
+```{r}
+#| label: set_options
+#| code-summary: report-wide formatting options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+# set options shared by all chunks
+opts_chunk$set(
+  results    = 'show',
+  message    = FALSE,
+  warning    = FALSE,
+  comment    = NA,
+  tidy       = FALSE,
+  out.width  = "960px",
+  fig.width  = 10,
+  fig.height = 6,
+  fig.path   = 'figure-png-iso/'
+)
+echo_chunks    <- FALSE # Toggle for debugging.
+message_chunks <- FALSE # Toggle for debugging.
+options(width = 100)
+ggplot2::theme_set(ggplot2::theme_minimal())
+read_chunk("analysis/eda-2/eda-2.R") # This allows knitr to call chunks from R script
+```
+
+# Environment
+
+> Reviews the components of the working environment of the report. Non-technical readers are welcomed to skip.
+
+```{r}
+#| label: load-packages
+#| code-summary: Packages used in the current report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: load-sources
+#| code-summary: Collection of custom functions used in current repository
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-globals
+#| code-summary: Values used throughout the report.
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-functions
+#| code-summary: Custom functions defined for use in this report.
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+# Data
+
+> **TODO**: Describe the data lineage for EDA-2.
+
+-   **ds0**: Original source data — *replace with your description*
+-   **g2_data**: Derived summary created in `g2-data-prep` chunk — *replace with your description*
+
+```{r}
+#| label: load-data
+#| code-summary: Load original data (ds0)
+#| warning: false
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: tweak-data-0
+#| code-summary: Initial data cleaning and coercion
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-0
+#| code-summary: Data overview — ds0 structure
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-1
+#| code-summary: Variable-level glimpse of ds0
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-2
+#| code-summary: Key variable summary from ds0
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+# Analysis
+
+## Exploratory Visualization
+
+### First Look at the Data (g1)
+
+> **TODO**: Describe what this graph shows and why it is the first thing you look at.
+
+```{r}
+#| label: g1
+#| code-summary: Initial exploratory graph using original data (ds0)
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "TODO: Replace with a descriptive caption for g1"
+```
+
+## Graph Family g2x: \[Replace with Family Theme\]
+
+### Data Preparation
+
+> **TODO**: Describe what analytical question the g2 family explores and what the shared data ancestor represents.
+
+```{r}
+#| label: g2-data-prep
+#| code-summary: Prepare g2_data — shared ancestor for all g2x visualizations
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Primary View (g2)
+
+> **TODO**: Describe what this graph shows.
+
+```{r}
+#| label: g2
+#| code-summary: Primary g2 family visualization
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "TODO: Replace with a descriptive caption for g2"
+```
+
+### Alternative Perspective (g21)
+
+> **TODO**: Describe how this view differs from g2 while using the same data ancestor.
+
+```{r}
+#| label: g21
+#| code-summary: Second g2 family member — same data, different analytical lens
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "TODO: Replace with a descriptive caption for g21"
+```
+
+````{=html}
+<!-- 
+Add more graph family members here following the same pattern:
+
+### Another Family Member (g22)
+
+```{r}
+#| label: g22
+#| code-summary: ...
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "..."
+```
+
+Add new families (g3, g4, ...) by repeating the
+  data-prep + family-member chunk structure above.
+-->
+````
+
+# Session Info
+
+```{r}
+#| label: session-info
+#| code-summary: R session information for reproducibility
+#| echo: false
+#| code-fold: true
+cat("Report completed at:", as.character(Sys.time()), "\n")
+cat("Total runtime:", round(difftime(Sys.time(), report_render_start_time, units = "mins"), 2), "minutes\n")
+sessionInfo()
+```
