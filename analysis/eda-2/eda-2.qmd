@@ -1,0 +1,430 @@
+---
+title: "Work Absence Among Employed Canadians"
+subtitle: "EDA 2 — CCHS 2010-11 & 2013-14: Distribution of Absence Days"
+author: "Analysis Team"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    code-fold: show
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: true
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options:
+  chunk_output_type: console
+---
+
+# Mission
+
+This report explores how work absence days (`absence_days_total`) are distributed among employed Canadian respondents in the CCHS 2010-11 and 2013-14 survey cycles.
+
+-   **Dataset**: `cchs_employed` table from `cchs-3.sqlite` — each row is one employed survey respondent
+-   **Research Question**: How many absence days do employed Canadians report, and what does that distribution look like?
+-   **Data Lineage**: `ds0` → `ds1` (exclude NAs + 0-day) → `absence_ratio_tbl` (overview); `ds1` → `g1_data` → scatter + histogram; `ds1` → `g2_stats` / `sex_ratio_tbl` → faceted by sex; `ds1` → `g3_stats` → faceted by age group; `ds1` → `g4_data` / `g4_stats` → scatter + histogram by survey cycle; `ds1` → `ds5` (excl. NA education) → `g5_stats` → faceted by education level; `ds1` → `ds6` (excl. NA marital) → `g6_stats` → faceted by marital status; `ds1` → `ds7` (excl. NA immigration) → `g7_stats` → faceted by immigration status
+-   **Scope**: Descriptive distribution of `absence_days_total`; no modelling in this EDA
+
+# Definition of Terms
+
+```{r}
+#| code-summary: Reconciles working directory between execution modes
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = '../../') # keep this chunk isolated
+```
+
+```{r}
+#| label: set_options
+#| code-summary: report-wide formatting options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+# set options shared by all chunks
+opts_chunk$set(
+  results    = 'show',
+  message    = FALSE,
+  warning    = FALSE,
+  comment    = NA,
+  tidy       = FALSE,
+  out.width  = "960px",
+  fig.width  = 10,
+  fig.height = 6,
+  fig.path   = 'figure-png-iso/'
+)
+echo_chunks    <- FALSE # Toggle for debugging.
+message_chunks <- FALSE # Toggle for debugging.
+options(width = 100)
+ggplot2::theme_set(ggplot2::theme_minimal())
+read_chunk("analysis/eda-2/eda-2.R") # This allows knitr to call chunks from R script
+```
+
+# Environment
+
+> Reviews the components of the working environment of the report. Non-technical readers are welcomed to skip.
+
+```{r}
+#| label: load-packages
+#| code-summary: Packages used in the current report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: load-sources
+#| code-summary: Collection of custom functions used in current repository
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-globals
+#| code-summary: Values used throughout the report.
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-functions
+#| code-summary: Custom functions defined for use in this report.
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+# Data
+
+-   **ds0**: `cchs_employed` from `cchs-3.sqlite` — 64,248 employed respondents, one row each. Key column: `absence_days_total` (integer days missed due to any health reason).
+-   **ds1**: Filtered from `ds0` — respondents with 1+ absence days only (0-day and NA respondents excluded). Working dataset for all analysis.
+-   **g1_data**: Aggregated from `ds1` — one row per unique `absence_days_total` value with the count of respondents reporting that value.
+-   **g2_stats**: Summarised from `ds1` — one row per `sex_label` with per-sex median, mean, and respondent count.
+-   **sex_ratio_tbl**: Derived from `ds0` — per-sex count and percentage of respondents reporting zero vs. 1+ absence days (among those who answered).
+-   **g3_stats**: Summarised from `ds1` — one row per `age_group_3` with per-group median, mean, and respondent count. Saved to `data-local/g3_stats_age.csv`.
+-   **g4_data**: Aggregated from `ds1` — one row per (`survey_cycle_label` × unique `absence_days_total` value) with respondent count; used for the g4 scatter.
+-   **g4_stats**: Summarised from `ds1` — one row per `survey_cycle_label` with per-cycle median, mean, and respondent count.
+-   **g5_stats**: Summarised from `ds5` (`ds1` minus NA `education_level`) — one row per `education_level` with per-group median, mean, and respondent count.
+-   **g6_stats**: Summarised from `ds6` (`ds1` minus NA `marital_status_label`) — one row per `marital_status_label` with per-group median, mean, and respondent count.
+-   **g7_stats**: Summarised from `ds7` (`ds1` minus NA `immigration_status_label`) — one row per `immigration_status_label` with per-group median, mean, and respondent count.
+
+```{r}
+#| label: load-data
+#| code-summary: Load original data (ds0)
+#| warning: false
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: tweak-data-0
+#| code-summary: Initial data cleaning and coercion
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: tweak-data-1
+#| code-summary: Create ds1 — exclude 0-day and NA respondents
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-0
+#| code-summary: Data overview — ds0 structure
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-1
+#| code-summary: Variable-level glimpse of ds0
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-2
+#| code-summary: Key variable summary from ds0
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-3
+#| code-summary: ds1 summary — central tendency of absence days (1+ only)
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+## Absence Overview: Who Reports Missing Days?
+
+Among employed Canadians who answered `absence_days_total`, the majority report **zero absence days**. The table below shows the breakdown; the graphs in the Analysis section focus only on the `1+ days` subgroup (`ds1`).
+
+```{r}
+#| label: analytic-absence-ratio
+#| code-summary: Ratio of zero-absence vs. any-absence respondents
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+# Analysis
+
+## Graph Family g1: Distribution of Absence Days
+
+### Data Preparation
+
+`g1_data` aggregates `ds1` (respondents with 1+ absence days) by unique values of `absence_days_total`, counting how many respondents reported each value. Median and mean are computed from `ds1` and appear as reference lines on both graphs below.
+
+```{r}
+#| label: g1-data-prep
+#| code-summary: Prepare g1_data — frequency count per absence-day value
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Scatter Plot (g1-scatter)
+
+Each point represents one unique value of `absence_days_total` (x-axis) plotted against the number of respondents with that value (y-axis). A dashed red line marks the median; a dotted orange line marks the mean. Both 0-day and NA respondents are excluded.
+
+```{r}
+#| label: g1-scatter
+#| code-summary: Scatter — unique day-values vs. respondent count
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Scatter of unique absence-day values (x) vs. respondent count (y). X-axis zoomed to 1–40 via coord_cartesian (tail outside view). Breaks every 5 days. Dashed red = median, dotted orange = mean."
+```
+
+### Histogram (g1-hist)
+
+Same population as the scatter (`ds1`, 1+ days only), binned into 5-day intervals and capped at 100 days for legibility. Median and mean reference lines are identical to the scatter. The right skew is prominent — the bulk of absent workers miss fewer than 15 days.
+
+```{r}
+#| label: g1-hist
+#| code-summary: Histogram — distribution of absence days (5-day bins, capped at 100)
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Histogram of absence_days_total in 5-day bins, zoomed to 1–40 days via coord_cartesian (tail data not dropped). Breaks every 5 days. Dashed red = median, dotted orange = mean."
+```
+
+## Graph Family g2: Absence Days by Sex
+
+### Data Preparation
+
+`g2_stats` computes the median, mean, and respondent count for each `sex_label` group from `ds1`. These per-sex statistics drive the reference lines in the faceted histogram below.
+
+```{r}
+#| label: g2-data-prep
+#| code-summary: Prepare g2_stats — per-sex central tendency from ds1
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Absence Ratio by Sex
+
+Among employed Canadians who answered `absence_days_total`, the table below shows what share of each sex group reported zero absence days versus one or more. This provides context for interpreting the histograms: even within a sex, the majority of respondents report no absence at all.
+
+```{r}
+#| label: analytic-sex-ratio
+#| code-summary: Per-sex count and percentage of zero-absence vs. 1+ absence respondents
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Histograms by Sex (g2-hist-sex)
+
+Two panels side by side — one per sex. Each panel uses the same 5-day bins and 1–100 zoom as `g1-hist`, with its own median and mean reference lines so within-sex shape and between-sex differences are directly comparable.
+
+```{r}
+#| label: g2-hist-sex
+#| code-summary: Faceted histogram — absence day distribution split by sex_label
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Absence day distribution by sex (5-day bins, zoomed 1–40). Each panel shows the within-sex distribution; dashed red = per-sex median, dotted orange = per-sex mean."
+```
+
+## Graph Family g3: Absence Days by Age Group
+
+### Data Preparation
+
+`g3_stats` computes the median, mean, and respondent count for each `age_group_3` from `ds1`. Parameters are also saved to `data-local/g3_stats_age.csv` for downstream use.
+
+```{r}
+#| label: g3-data-prep
+#| code-summary: Prepare g3_stats — per-age-group central tendency from ds1
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Histograms by Age Group (g3-hist-age)
+
+One panel per `age_group_3`, laid out side by side. Same 5-day bins and 1–40 zoom as the prior families. Each panel carries its own per-group median and mean so within-age shape and between-age differences are directly comparable.
+
+```{r}
+#| label: g3-hist-age
+#| code-summary: Faceted histogram — absence day distribution by age_group_3
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Absence day distribution by age group (5-day bins, zoomed 1–40). One panel per age_group_3; dashed red = per-group median, dotted orange = per-group mean. Parameters saved to g3_stats_age.csv."
+```
+
+## Graph Family g4: g1 Replicated by Survey Cycle
+
+### Data Preparation
+
+`g4_data` aggregates `ds1` within each `survey_cycle_label` to produce per-cycle frequency counts of `absence_days_total`. `g4_stats` provides per-cycle median and mean for the reference lines.
+
+```{r}
+#| label: g4-data-prep
+#| code-summary: Prepare g4_data and g4_stats — per-cycle frequency and central tendency
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Scatter Plot by Cycle (g4-scatter-cycle)
+
+Direct replication of `g1-scatter`, split into one panel per `survey_cycle_label`. Each point is a unique absence-day value within that cycle; per-cycle median and mean reference lines allow cycle-to-cycle comparison at a glance.
+
+```{r}
+#| label: g4-scatter-cycle
+#| code-summary: Scatter by survey cycle — unique day-values vs. respondent count per cycle
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Per-cycle scatter: each point is a unique absence-day value within the cycle. Dashed red = per-cycle median, dotted orange = per-cycle mean. Zoomed to 1–40 days."
+```
+
+### Histogram by Cycle (g4-hist-cycle)
+
+Direct replication of `g1-hist`, split by `survey_cycle_label`. Same 5-day bins and 1–40 zoom. Comparing panel heights reveals how the total number of respondents differs between cycles; comparing peak location and reference lines reveals distributional differences.
+
+```{r}
+#| label: g4-hist-cycle
+#| code-summary: Histogram by survey cycle — 5-day bins, zoomed to 1–40
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Per-cycle histogram of absence_days_total (5-day bins, zoomed 1–40). Dashed red = per-cycle median, dotted orange = per-cycle mean."
+```
+
+## Graph Family g5: Absence Days by Education Level
+
+### Data Preparation
+
+`g5_stats` computes the median, mean, and respondent count for each `education_level` group from `ds5` — `ds1` with respondents missing `education_level` removed. These per-group statistics drive the reference lines in the faceted histogram below.
+
+```{r}
+#| label: g5-data-prep
+#| code-summary: Prepare g5_stats — per-education-level central tendency from ds1
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Histograms by Education Level (g5-hist-edu)
+
+One panel per `education_level`, laid out in three columns. Same 5-day bins and 1–40 zoom as prior families. Each panel carries its own per-group median and mean so within-education shape and between-group differences are directly comparable.
+
+```{r}
+#| label: g5-hist-edu
+#| code-summary: Faceted histogram — absence day distribution by education_level
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Absence day distribution by education level (5-day bins, zoomed 1–40). One panel per education_level; dashed red = per-group median, dotted orange = per-group mean."
+```
+
+## Graph Family g6: Absence Days by Marital Status
+
+### Data Preparation
+
+`g6_stats` computes the median, mean, and respondent count for each `marital_status_label` group from `ds6` — `ds1` with respondents missing `marital_status_label` removed. These per-group statistics drive the reference lines in the faceted histogram below.
+
+```{r}
+#| label: g6-data-prep
+#| code-summary: Prepare g6_stats — per-marital-status central tendency from ds1
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Histograms by Marital Status (g6-hist-marital)
+
+One panel per `marital_status_label`, laid out in three columns. Same 5-day bins and 1–40 zoom as prior families. Each panel carries its own per-group median and mean so within-status shape and between-group differences are directly comparable.
+
+```{r}
+#| label: g6-hist-marital
+#| code-summary: Faceted histogram — absence day distribution by marital_status_label
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Absence day distribution by marital status (5-day bins, zoomed 1–40). One panel per marital_status_label; dashed red = per-group median, dotted orange = per-group mean."
+```
+
+## Graph Family g7: Absence Days by Immigration Status
+
+### Data Preparation
+
+`g7_stats` computes the median, mean, and respondent count for each `immigration_status_label` group from `ds7` — `ds1` with respondents missing `immigration_status_label` removed. These per-group statistics drive the reference lines in the faceted histogram below.
+
+```{r}
+#| label: g7-data-prep
+#| code-summary: Prepare g7_stats — per-immigration-status central tendency from ds7
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+### Histograms by Immigration Status (g7-hist-immigration)
+
+One panel per `immigration_status_label`, laid out in three columns. Same 5-day bins and 1–40 zoom as prior families. Each panel carries its own per-group median and mean so within-status shape and between-group differences are directly comparable.
+
+```{r}
+#| label: g7-hist-immigration
+#| code-summary: Faceted histogram — absence day distribution by immigration_status_label
+#| code-fold: true
+#| eval: true
+#| cache: true
+#| fig-cap: "Absence day distribution by immigration status (5-day bins, zoomed 1–40). One panel per immigration_status_label; dashed red = per-group median, dotted orange = per-group mean."
+```
+
+# Session Info
+
+```{r}
+#| label: session-info
+#| code-summary: R session information for reproducibility
+#| echo: false
+#| code-fold: true
+cat("Report completed at:", as.character(Sys.time()), "\n")
+cat("Total runtime:", round(difftime(Sys.time(), report_render_start_time, units = "mins"), 2), "minutes\n")
+sessionInfo()
+```

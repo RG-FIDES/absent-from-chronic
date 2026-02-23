@@ -4,6 +4,12 @@ AI system status and technical briefings.
 
 ---
 
+# 2026-02-23
+
+Built `analysis/eda-2/eda-2.R` and `analysis/eda-2/eda-2.qmd` from scratch using the R + Quarto dual-file pattern (R = development layer with `# ---- chunk-name ----` sections; qmd calls `read_chunk()` and references labels). Source: `cchs_employed` table from `cchs-3.sqlite` (64,248 rows). Data pipeline: `ds0` (raw) → `ds1` (filter absence_days_total ≥ 1, not NA) → per-variable subsets `ds5`/`ds6`/`ds7` (drop NAs for education_level / marital_status_label / immigration_status_label respectively) to avoid blank facet panels. Seven graph families produced: g1 (overall scatter + histogram), g2 (by sex_label), g3 (by age_group_3, stats saved to CSV), g4 (by survey_cycle_label, scatter + histogram), g5 (by education_level, ds5), g6 (by marital_status_label, ds6), g7 (by immigration_status_label, ds7). All graphs: `coord_cartesian(xlim = c(1,40))` zoom, 5-day bins/breaks, firebrick dashed median + darkorange dotted mean lines; faceted graphs use `geom_label(data=stats_df, inherit.aes=FALSE)` instead of `annotate()` because `annotate()` ignores facets. Two analytic tables: `absence_ratio_tbl` (overall 0-day vs. 1+ ratio) and `sex_ratio_tbl` (per-sex 0-day vs. 1+ ratio). Full session logged in `ai/memory/log/2025-02-23-analysing.md`.
+
+---
+
 # 2026-02-22
 
 Updated `manipulation/2-ellis.R` to retain the full pooled CCHS sample by default (including employed and unemployed), matching raw ferry-scale output instead of legacy employed-only filtering (~64k). Added configurable switch `apply_sample_exclusions` (default `FALSE`) so legacy Section 3.1 exclusions remain available when explicitly enabled. Validated end-to-end run: pooled analytical output now `126,431` rows in both `data-private/derived/cchs-2.sqlite` (`cchs_analytical`) and `data-private/derived/cchs-2-tables/cchs_analytical.parquet`; sample flow updated to reflect full-sample mode. Aligned with human memory + session objective in `ai/memory/log/2026-02-22-cchs.md`, including next planned task: create `manipulation/3-ellis.R` to produce clearer outputs in `data-private/derived/cchs-3.sqlite` and `data-private/derived/cchs-3-tables/`.

@@ -135,3 +135,9 @@ analysis/*/*/*/*.html
 !*renv/settings.json
 # --- Dictionary files ---
 *-dictionary*.md
+
+# ------ dynamic files ------
+*tmpclaude*
+../data-local/
+analysis/*/data-local/
+
