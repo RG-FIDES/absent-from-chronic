@@ -3,6 +3,8 @@
 Human decisions and reasoning.
 
 ---
+# 2026-02-25
+We are going to do some tasks to run each eda, add task to run flow.r. 
 # 2026-02-22
 
 We want to complete the existed 2-ellis.R script that it will get the full sample in the output .sqlite. Create a new 3-ellis.R, which will produce clearer data in the ccsh-3.sqlite and in a new tables cchs-3-tables/ folder in the data-private/folder.In a new table will be deleted usesless columns. WIll be filtered by separeted on 2 tables (employed and unemployed). Renamed columns for better understanding.
