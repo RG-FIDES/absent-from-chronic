@@ -1,0 +1,112 @@
+---
+title: "Absent from Chronic"
+subtitle: "AI-Augmented Reproducible Research on Work Absenteeism"
+page-layout: full
+toc: false
+---
+
+> *No one beginning a data science project should start from a blinking cursor.*
+> — [Megan Risdal](https://towardsdatascience.com/@meganrisdal), Kaggle Product Lead
+
+This project is a **quick-start template for AI-augmented reproducible research**. It combines
+reproducible research best practices with an AI support infrastructure that leverages generative
+LLMs and agent customization to construct and manage analytic pipelines.
+
+The project applies the template to a real research question: **How many days of work do
+employed Canadians miss due to health reasons, and how does that vary across demographic groups?**
+Data source: Canadian Community Health Survey (CCHS), cycles 2010–11 and 2013–14.
+
+---
+
+## Site Map
+
+:::: {.columns}
+
+::: {.column width="48%"}
+
+### Analysis
+
+| Page | Description |
+|------|-------------|
+| [EDA 1 — Vehicle Performance](analysis/eda-1/eda-1.qmd) | Template example using `mtcars`. Demonstrates data genealogy and graph families. |
+| [EDA 2 — Work Absence (CCHS)](analysis/eda-2/eda-2.qmd) | Core analysis. Distribution of `absence_days_total` by sex, age, education, marital status, immigration status, and survey cycle. |
+
+### Data
+
+| Page | Description |
+|------|-------------|
+| [Data Overview](pages/data.qmd) | Raw inputs, analysis-ready derived datasets, variable definitions, survey design. |
+| [Pipeline](pages/pipeline.qmd) | Full Ferry → Ellis execution guide: scripts, outputs, exclusion criteria, troubleshooting. |
+
+:::
+
+::: {.column width="4%"}
+:::
+
+::: {.column width="48%"}
+
+### Reference
+
+| Page | Description |
+|------|-------------|
+| [Guides](pages/guides.qmd) | Getting started, environment management, AI system setup, VS Code tasks. |
+| [Philosophy](pages/philosophy.qmd) | Methodology notes: analysis templatization, causal inference, threats to validity, semiology of graphics. |
+| [Authors](pages/authors.qmd) | Project team, license, and contribution history. |
+
+:::
+
+::::
+
+---
+
+## AI Persona System
+
+This template includes **9 specialized AI personas**, each optimized for a different research role:
+
+| Persona | Role |
+|---------|------|
+| Developer | Technical infrastructure and reproducible code |
+| Project Manager | Strategic oversight and coordination |
+| Research Scientist | Statistical analysis and methodology |
+| Prompt Engineer | AI optimization and prompt design |
+| Data Engineer | Data pipelines and quality assurance |
+| Grapher | Data visualization and exploratory analysis |
+| Reporter | Analysis communication and storytelling |
+| DevOps Engineer | Deployment and operational excellence |
+| Frontend Architect | User interfaces and visualization |
+
+Switch personas in VS Code: `Ctrl+Shift+P` → *Tasks: Run Task* → *Activate [Persona Name] Persona*.
+
+---
+
+## Memory System
+
+The template maintains project continuity across sessions via three files:
+
+- `ai/memory/memory-human.md` — your decisions and reasoning (humans only)
+- `ai/memory/memory-ai.md` — AI-maintained technical status (AI only)
+- `ai/memory/log/YYYY-MM-DD.md` — per-session logs for isolated change tracking
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/oleksandkov/absent-from-chronic-oleksandkov
+cd absent-from-chronic-oleksandkov
+```
+
+Then open `quick-start-template.Rproj` in RStudio or the folder in VS Code.
+Install R dependencies:
+
+```r
+Rscript utility/install-packages.R   # flexible: recommended for most users
+# or
+Rscript utility/init-renv.R          # strict: exact reproducibility
+```
+
+See [Guides](pages/guides.qmd) for full setup instructions.
+
+---
+
+*Refer to [RAnalysisSkeleton](https://github.com/wibeasley/RAnalysisSkeleton) for a deeper dive into reproducible research best practices.*
