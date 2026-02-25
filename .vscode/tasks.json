@@ -181,6 +181,45 @@
       "group": "build",
       "presentation": { "echo": true, "reveal": "always", "panel": "shared" },
       "problemMatcher": []
+    },
+    {
+      "label": "Run Complete Ellis Pipeline",
+      "detail": "Execute the full analysis pipeline via run-complete-ellis-pipeline.ps1",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-File",
+        "scripts/ps1/run-complete-ellis-pipeline.ps1"
+      ],
+      "group": "build",
+      "presentation": { "echo": true, "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run EDA-1 Pipeline",
+      "detail": "Run analysis/eda-1/eda-1.R then render analysis/eda-1/eda-1.qmd",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-File",
+        "scripts/ps1/run-eda-1.ps1"
+      ],
+      "group": "build",
+      "presentation": { "echo": true, "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run EDA-2 Pipeline",
+      "detail": "Run analysis/eda-2/eda-2.R then render analysis/eda-2/eda-2.qmd",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-File",
+        "scripts/ps1/run-eda-2.ps1"
+      ],
+      "group": "build",
+      "presentation": { "echo": true, "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
     }
   ]
 }
