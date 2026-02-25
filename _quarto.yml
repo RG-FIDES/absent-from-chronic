@@ -1,6 +1,15 @@
 project:
   type: website
   output-dir: _site
+  render:
+    - index.qmd
+    - pages/data.qmd
+    - pages/pipeline.qmd
+    - pages/guides.qmd
+    - pages/philosophy.qmd
+    - pages/authors.qmd
+    - analysis/eda-1/eda-1.qmd
+    - analysis/eda-2/eda-2.qmd
 
 execute:
   freeze: auto   # use cached results; re-run only when source changes
