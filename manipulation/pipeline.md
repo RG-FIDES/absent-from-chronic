@@ -14,6 +14,9 @@ CCHS .sav files (data-private/raw/)
          │
          ▼  2-ellis.R   ← white-list + harmonize + recode
   cchs-2.sqlite + cchs-2-tables/*.parquet   (analysis-ready)
+    │
+    ▼  3-ellis.R   ← clarity layer + split analyst tables
+  cchs-3.sqlite + cchs-3-tables/*.parquet + 3-ellis.html
          │
          ▼  2-test-ellis-cache.R   ← alignment verification
   console report (pass/fail)
@@ -27,7 +30,8 @@ CCHS .sav files (data-private/raw/)
 |---|------|---------|--------|
 | 1 | `manipulation/1-ferry.R` | Ferry | `data-private/derived/cchs-1.sqlite` + Parquet backup |
 | 2 | `manipulation/2-ellis.R` | Ellis | `data-private/derived/cchs-2.sqlite` + `cchs-2-tables/` Parquet |
-| 3 | `manipulation/2-test-ellis-cache.R` | Test | Console test report |
+| 3 | `manipulation/3-ellis.R` | Ellis | `data-private/derived/cchs-3.sqlite` + `cchs-3-tables/` + `manipulation/3-ellis.html` |
+| 4 | `manipulation/2-test-ellis-cache.R` | Test | Console test report |
 
 ---
 
@@ -43,6 +47,7 @@ Runs ferry → ellis → all downstream analyses in sequence.
 ```r
 source("manipulation/1-ferry.R")   # ~2–5 min depending on file size
 source("manipulation/2-ellis.R")   # ~1–2 min
+source("manipulation/3-ellis.R")   # ~1 min
 source("manipulation/2-test-ellis-cache.R")   # <30 sec
 ```
 
@@ -50,6 +55,7 @@ source("manipulation/2-test-ellis-cache.R")   # <30 sec
 Use the tasks defined in `.vscode/tasks.json`:
 - **Run Ferry Lane 1** — `Rscript manipulation/1-ferry.R`
 - **Run Ellis Lane 2** — `Rscript manipulation/2-ellis.R`
+- **Run Ellis Lane 3** — `Rscript manipulation/3-ellis.R`
 - **Test Ellis ↔ CACHE-Manifest Alignment** — `Rscript manipulation/2-test-ellis-cache.R`
 
 ---
@@ -78,9 +84,45 @@ Paths are configured in `config.yml` under `raw_data`.
 
 | Artifact | Location | Format | Description |
 |----------|----------|--------|-------------|
-| `cchs_analytical.parquet` | `data-private/derived/cchs-2-tables/` | Parquet | Main analysis dataset (~64k rows) |
+| `cchs_analytical.parquet` | `data-private/derived/cchs-2-tables/` | Parquet | Main analysis dataset (full pooled sample mode by default) |
 | `sample_flow.parquet` | `data-private/derived/cchs-2-tables/` | Parquet | Exclusion audit trail (5 rows) |
 | `cchs-2.sqlite` | `data-private/derived/` | SQLite | Same tables as Parquet (factors as character) |
+
+### Ellis Lane 3 outputs (clarity + splits)
+
+| Artifact | Location | Format | Description |
+|----------|----------|--------|-------------|
+| `cchs_analytical.parquet` | `data-private/derived/cchs-3-tables/` | Parquet | Renamed analysis table: keeps retained fields, excludes selected columns, applies clarity names |
+| `cchs_employed.parquet` | `data-private/derived/cchs-3-tables/` | Parquet | Employed-only split (`employment_code == 1`) |
+| `cchs_unemployed.parquet` | `data-private/derived/cchs-3-tables/` | Parquet | Not-employed remainder split (`employment_code != 1` or missing); complements `cchs_employed` |
+| `sample_flow.parquet` | `data-private/derived/cchs-3-tables/` | Parquet | Lane 2 flow audit carried into Lane 3 |
+| `data_dictionary.parquet` | `data-private/derived/cchs-3-tables/` | Parquet | Dictionary for excluded + renamed fields |
+| `cchs-3.sqlite` | `data-private/derived/` | SQLite | Same Lane 3 tables for SQL exploration |
+| `3-ellis.html` | `manipulation/` | HTML | Rendered report (or fallback HTML if Pandoc unavailable) |
+
+Lane 3 exclusions currently applied:
+- `adm_rno`
+- `income_5cat`
+- `employment_type`
+- `work_schedule`
+- `alcohol_type`
+- `bmi_category`
+- `dhhgage`
+
+Lane 3 key renames currently applied:
+- `cycle` → `survey_cycle_id`
+- `lop_015` → `employment_code`
+- `adm_prx` → `proxy_code`
+- `days_absent_total` → `absence_days_total`
+- `days_absent_chronic` → `absence_days_chronic`
+- `wts_m_pooled` → `weight_pooled`
+- `wts_m_original` → `weight_original`
+- `geodpmf` → `geo_region_id`
+
+Lane 3 additionally applies broad clarity renaming for remaining retained fields
+(demographics, outcomes, and chronic-condition indicators). See:
+- `data-private/derived/cchs-3-tables/data_dictionary.parquet`
+- `data-public/metadata/cchs-3-column-dictionary-uk.md`
 
 **Parquet is the primary format** — it preserves R factor types and level ordering, which
 matters for downstream models and plots. SQLite is a secondary convenience format.
@@ -110,6 +152,9 @@ Ellis logs a warning with a list of missing names and drops them. Analysis conti
 
 ## Exclusion Criteria (sample_flow)
 
+`2-ellis.R` now runs in **full pooled sample mode by default** (`apply_sample_exclusions = FALSE`).
+Legacy exclusion filtering is still available when explicitly enabled (`apply_sample_exclusions = TRUE`).
+
 | Step | Criterion | Expected % retained |
 |------|-----------|---------------------|
 | 1 | Raw CCHS stacked sample | 100% |
@@ -118,7 +163,9 @@ Ellis logs a warning with a list of missing names and drops them. Analysis conti
 | 4 | Non-proxy respondent (`adm_prx != 1`) | ~99% of step 3 |
 | 5 | Complete outcome (any LOP var non-missing) | ~95% of step 4 |
 
-Reference final sample: **~64,141** respondents.
+Reference final sample:
+- **Default mode (`apply_sample_exclusions = FALSE`)**: `126,431`
+- **Legacy exclusion mode (`apply_sample_exclusions = TRUE`)**: ~`64,141`
 
 ---
 
@@ -141,7 +188,8 @@ After running `2-ellis.R`, verify these values match expectations:
 
 | Diagnostic | Reference |
 |------------|-----------|
-| Final sample size | ~64,141 |
+| Final sample size (default mode) | 126,431 |
+| Final sample size (legacy exclusion mode) | ~64,141 |
 | Weighted mean `days_absent_total` | ≈ 1.35 |
 | % zeros in `days_absent_total` | ≈ 70.6% |
 | Variance of `days_absent_total` | ≈ 17.7 |
@@ -176,8 +224,9 @@ After running `2-ellis.R`, verify these values match expectations:
 |------|----------|
 | `data-public/metadata/INPUT-manifest.md` | Raw source file descriptions |
 | `data-public/metadata/CACHE-manifest.md` | Analysis-ready dataset descriptions (auto-updated by Ellis) |
+| `data-public/metadata/cchs-3-column-dictionary-uk.md` | Lane 3 column dictionary (Ukrainian) |
 | `manipulation/pipeline.md` | This file |
 
 ---
 
-*Last updated: 2026-02-19*
+*Last updated: 2026-02-22*

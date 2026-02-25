@@ -1,0 +1,43 @@
+# Python Package Requirements for Visualization & Analysis
+# Similar role to package-dependency-list.csv for R packages
+# Used by utility/init-venv.py to populate the project virtual environment
+#
+# Format: package_name>=minimum_version   # description
+# Pin exact versions by replacing >= with ==
+
+# ── Core Visualization ──────────────────────────────────────────────────────
+
+# Static charts (publication-quality, matplotlib-based)
+matplotlib>=3.7.0          # Foundation plotting library
+seaborn>=0.12.0            # Statistical visualization on top of matplotlib
+
+# Interactive charts (widget/HTML-based)
+plotly>=5.18.0             # Interactive charts; exports to HTML or PNG
+bokeh>=3.3.0               # Interactive web-ready visualizations
+
+# Additional interactive / specialized
+altair>=5.2.0              # Declarative grammar of graphics (Vega-Altair)
+
+# ── Data Manipulation ────────────────────────────────────────────────────────
+pandas>=2.0.0              # DataFrames – required by most viz libraries
+numpy>=1.24.0              # Numerical arrays
+
+# ── Notebook / Report Integration ────────────────────────────────────────────
+ipykernel>=6.25.0          # Jupyter kernel so VS Code notebooks work
+nbformat>=5.9.0            # Notebook file format support
+# ipywidgets>=8.1.0        # Interactive widgets – installs JupyterLab extensions
+#                          # with very long paths; fails on Windows without LongPaths
+#                          # enabled. Enable via: reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+# ── Output / Export Utilities ────────────────────────────────────────────────
+kaleido>=0.2.1             # Static image export for Plotly (PNG, SVG, PDF)
+pillow>=10.0.0             # Image processing (used by matplotlib savefig)
+
+# ── Optional: nice-to-have extras ───────────────────────────────────────────
+# Uncomment to include:
+# plotnine>=0.12.0         # ggplot2-style API for Python
+# holoviews>=1.18.0        # High-level Bokeh/Matplotlib interface
+# hvplot>=0.9.0            # pandas .hvplot() accessor for quick interactive plots
+# pywaffle>=1.0.0          # Waffle charts
+# squarify>=0.4.3          # Treemap charts
+# wordcloud>=1.9.2         # Word cloud generation

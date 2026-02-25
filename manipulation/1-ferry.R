@@ -54,20 +54,29 @@ requireNamespace("fs")
 
 script_start <- Sys.time()
 
+# ---- load-sources ------------------------------------------------------------
+project_root <- if (dir.exists("scripts") && dir.exists("manipulation")) {
+  "."
+} else if (dir.exists("../scripts") && dir.exists("../manipulation")) {
+  ".."
+} else {
+  stop("Cannot locate project root. Run from project root or from manipulation/.")
+}
+
 # ---- declare-globals ---------------------------------------------------------
 
 # Source files (CCHS PUMF SPSS format)
-path_sav_2010 <- "./data-private/raw/2026-02-19/CCHS2010_LOP.sav"
-path_sav_2014 <- "./data-private/raw/2026-02-19/CCHS_2014_EN_PUMF.sav"
+path_sav_2010 <- file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS2010_LOP.sav")
+path_sav_2014 <- file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS_2014_EN_PUMF.sav")
 
 # Output — SQLite (primary staging)
-output_sqlite  <- "./data-private/derived/cchs-1.sqlite"
+output_sqlite  <- file.path(project_root, "data-private", "derived", "cchs-1.sqlite")
 output_dir     <- dirname(output_sqlite)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Output — Parquet backup
-output_parquet_dir <- "./data-private/derived/cchs-1-raw/"
-if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recursive = TRUE)
+output_parquet_dir <- file.path(project_root, "data-private", "derived", "cchs-1-raw")
+if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recurse = TRUE)
 
 # Table names in SQLite
 table_2010 <- "cchs_2010_raw"
@@ -90,7 +99,8 @@ cat(strrep("=", 70), "\n")
 
 if (!file.exists(path_sav_2010)) {
   stop("Source file not found: ", path_sav_2010,
-       "\nExpected at: ./data-private/raw/2026-02-19/CCHS2010_LOP.sav")
+  "\nExpected at project path: ",
+  file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS2010_LOP.sav"))
 }
 
 cat("Reading SPSS file...\n")
@@ -113,22 +123,33 @@ cat("\n", strrep("=", 70), "\n")
 cat("SECTION 1B: LOAD CCHS 2013-2014\n")
 cat(strrep("=", 70), "\n")
 
+use_2014_placeholder <- FALSE
+
 if (!file.exists(path_sav_2014)) {
-  stop("Source file not found: ", path_sav_2014,
-       "\nExpected at: ./data-private/raw/2026-02-19/CCHS_2014_EN_PUMF.sav")
+  warning(
+    "Source file not found: ", path_sav_2014,
+    "\nProceeding with a 0-row placeholder for 2014 using the 2010 schema.",
+    "\nExpected at project path: ",
+    file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS_2014_EN_PUMF.sav")
+  )
+  ds_2014 <- ds_2010[0, , drop = FALSE]
+  use_2014_placeholder <- TRUE
+} else {
+  cat("Reading SPSS file...\n")
+  ds_2014_raw <- haven::read_sav(path_sav_2014)
+
+  ds_2014 <- ds_2014_raw %>%
+    haven::zap_labels() %>%
+    haven::zap_label() %>%
+    janitor::clean_names()
 }
-
-cat("Reading SPSS file...\n")
-ds_2014_raw <- haven::read_sav(path_sav_2014)
-
-ds_2014 <- ds_2014_raw %>%
-  haven::zap_labels() %>%
-  haven::zap_label() %>%
-  janitor::clean_names()
 
 cat(sprintf("✓ CCHS 2013-2014 loaded: %s rows, %s columns\n",
             format(nrow(ds_2014), big.mark = ","),
             format(ncol(ds_2014), big.mark = ",")))
+if (use_2014_placeholder) {
+  cat("⚠ Using 2014 placeholder (0 rows). Add CCHS_2014_EN_PUMF.sav for full two-cycle processing.\n")
+}
 
 # ==============================================================================
 # SECTION 2: VALIDATE STRUCTURE

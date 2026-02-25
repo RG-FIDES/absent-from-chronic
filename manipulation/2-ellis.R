@@ -66,23 +66,47 @@ requireNamespace("arrow")
 requireNamespace("fs")
 
 # ---- load-sources ------------------------------------------------------------
-base::source("./scripts/common-functions.R")
+project_root <- if (dir.exists("scripts") && dir.exists("manipulation")) {
+  "."
+} else if (dir.exists("../scripts") && dir.exists("../manipulation")) {
+  ".."
+} else {
+  stop("Cannot locate project root. Run from project root or from manipulation/.")
+}
+
+base::source(file.path(project_root, "scripts", "common-functions.R"))
 
 # ---- declare-globals ---------------------------------------------------------
 
 # Input (ferry output)
-input_sqlite  <- "./data-private/derived/cchs-1.sqlite"
+input_sqlite_candidates <- unique(c(
+  file.path(project_root, "data-private", "derived", "cchs-1.sqlite"),
+  file.path(".", "data-private", "derived", "cchs-1.sqlite"),
+  file.path("..", "data-private", "derived", "cchs-1.sqlite")
+))
+input_sqlite <- input_sqlite_candidates[file.exists(input_sqlite_candidates)][1]
+if (is.na(input_sqlite)) input_sqlite <- input_sqlite_candidates[1]
 table_2010    <- "cchs_2010_raw"
 table_2014    <- "cchs_2014_raw"
 
+# Cycle integrity mode:
+#   TRUE  = stop if any cycle is empty (strict pooled analysis mode)
+#   FALSE = continue with available cycle(s), emit warnings (debug/single-cycle mode)
+strict_cycle_integrity <- FALSE
+
+# Sample filtering mode:
+#   FALSE = keep full pooled sample (default; includes employed + unemployed)
+#   TRUE  = apply legacy exclusions from stats_instructions_v3 Section 3.1
+apply_sample_exclusions <- FALSE
+
 # Output — SQLite (secondary: ad-hoc SQL exploration; factors as character)
-output_sqlite <- "./data-private/derived/cchs-2.sqlite"
+output_sqlite <- file.path(project_root, "data-private", "derived", "cchs-2.sqlite")
 output_dir    <- dirname(output_sqlite)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Output — Parquet (primary: preserves R factor types, levels, and order)
-output_parquet_dir <- "./data-private/derived/cchs-2-tables/"
-if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recursive = TRUE)
+output_parquet_dir <- file.path(project_root, "data-private", "derived", "cchs-2-tables")
+if (!fs::dir_exists(output_parquet_dir)) fs::dir_create(output_parquet_dir, recurse = TRUE)
 
 # --------------------------------------------------------------------------
 # WHITE-LIST: Variables selected for the analytical dataset
@@ -267,6 +291,38 @@ select_whitelist <- function(data, confirmed, inferred, bootstrap_pat,
   data[, keep_cols, drop = FALSE]
 }
 
+# Harmonize known cross-cycle alias names to canonical white-list names.
+# If canonical is missing and an alias exists, copy alias into canonical.
+harmonize_aliases <- function(data, alias_map, cycle_label = "") {
+  for (canonical in names(alias_map)) {
+    if (canonical %in% names(data)) next
+
+    aliases <- alias_map[[canonical]]
+    found <- intersect(aliases, names(data))
+    if (length(found) > 0) {
+      data[[canonical]] <- data[[found[1]]]
+      cat(sprintf("  [%s] harmonized alias: %s <- %s\n",
+                  cycle_label, canonical, found[1]))
+    }
+  }
+  data
+}
+
+# Ensure columns exist before recoding; add as NA when absent.
+ensure_columns <- function(data, cols, context_label = "") {
+  missing_cols <- setdiff(cols, names(data))
+  if (length(missing_cols) > 0) {
+    for (col in missing_cols) {
+      data[[col]] <- NA
+    }
+    warning(sprintf(
+      "[%s] Added %d missing column(s) as NA for downstream compatibility: %s",
+      context_label, length(missing_cols), paste(missing_cols, collapse = ", ")
+    ))
+  }
+  data
+}
+
 # Safely recode a numeric vector into a factor.
 # Returns NA (with a warning) for any values not in the code map.
 safe_recode_factor <- function(x, code_map, ordered = FALSE) {
@@ -289,13 +345,66 @@ cat(strrep("=", 70), "\n")
 
 if (!file.exists(input_sqlite)) {
   stop("Ferry output not found: ", input_sqlite,
-       "\nRun manipulation/1-ferry.R first.")
+  "\nSearched: ", paste(input_sqlite_candidates, collapse = "; "),
+  "\nRun manipulation/1-ferry.R first.")
 }
 
 cnn <- DBI::dbConnect(RSQLite::SQLite(), input_sqlite)
 ds_2010_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2010))
 ds_2014_raw <- DBI::dbGetQuery(cnn, sprintf("SELECT * FROM %s", table_2014))
 DBI::dbDisconnect(cnn)
+
+# Input guardrails for cycle availability
+if (nrow(ds_2010_raw) == 0L && nrow(ds_2014_raw) == 0L) {
+  stop(
+    sprintf(
+      paste0(
+        "Both ferry input tables are empty in %s.\\n",
+        "- %s rows: %s\\n",
+        "- %s rows: %s\\n",
+        "Cannot proceed: run 1-ferry.R with valid raw inputs."
+      ),
+      input_sqlite,
+      table_2010, format(nrow(ds_2010_raw), big.mark = ","),
+      table_2014, format(nrow(ds_2014_raw), big.mark = ",")
+    )
+  )
+}
+
+if (nrow(ds_2010_raw) == 0L || nrow(ds_2014_raw) == 0L) {
+  msg <- sprintf(
+    paste0(
+      "One ferry input table is empty in %s.\\n",
+      "- %s rows: %s\\n",
+      "- %s rows: %s\\n",
+      "Likely cause: missing raw .sav file or failed ingest in 1-ferry.R."
+    ),
+    input_sqlite,
+    table_2010, format(nrow(ds_2010_raw), big.mark = ","),
+    table_2014, format(nrow(ds_2014_raw), big.mark = ",")
+  )
+
+  if (strict_cycle_integrity) {
+    stop(msg, "\\nstrict_cycle_integrity=TRUE: stopping.")
+  } else {
+    warning(msg, "\\nContinuing with available cycle(s) because strict_cycle_integrity=FALSE.")
+  }
+}
+
+# Harmonize known alias names before white-list selection.
+alias_map <- list(
+  edudh04  = c("edudr04"),
+  sdcdgcb  = c("sdcgcgt"),
+  geodgprv = c("geogprv"),
+  hcu_1aa  = c("hcu_1a", "hcudgmd"),
+  lbfdghp  = c("lbsg031", "lbs_g31"),
+  gen_02a  = c("gen_02", "gen_02a2"),
+  gen_09   = c("gen_03"),
+  inj_01   = c("injdgyrs")
+)
+
+ds_2010_raw <- harmonize_aliases(ds_2010_raw, alias_map, cycle_label = "CCHS2010")
+ds_2014_raw <- harmonize_aliases(ds_2014_raw, alias_map, cycle_label = "CCHS2014")
 
 cat(sprintf("📥 Loaded CCHS 2010-2011: %s rows, %s columns\n",
             format(nrow(ds_2010_raw), big.mark = ","),
@@ -372,6 +481,18 @@ cat(sprintf("  ✓ Pooled (both cycles): %s rows, %s columns\n",
 cat(sprintf("  ✓ CCHS 2010-2011: %s rows\n", format(sum(ds0$cycle == 0L), big.mark = ",")))
 cat(sprintf("  ✓ CCHS 2013-2014: %s rows\n", format(sum(ds0$cycle == 1L), big.mark = ",")))
 
+if (sum(ds0$cycle == 0L, na.rm = TRUE) == 0L || sum(ds0$cycle == 1L, na.rm = TRUE) == 0L) {
+  msg <- paste0(
+    "Cycle integrity check before transformations: one cycle has 0 rows in pooled ds0.\n",
+    "Inspect white-list/alias mappings and upstream ferry input tables."
+  )
+  if (strict_cycle_integrity) {
+    stop(msg)
+  } else {
+    warning(msg)
+  }
+}
+
 # ==============================================================================
 # SECTION 2: ELLIS TRANSFORMATIONS
 # ==============================================================================
@@ -385,7 +506,8 @@ cat("\n🔧 Step 1: Construct outcome variables\n")
 #
 # Primary outcome: days_absent_total
 #   Sum of all 8 LOP reason variables. NA treated as 0 when at least one
-#   non-NA value exists across the 8 components; TRUE NA only when ALL are NA.
+#   non-NA value exists across the 8 components. When ALL are NA, treat as 0
+#   (no reported absence reasons) to preserve structural zeros.
 #
 # Sensitivity outcome: days_absent_chronic
 #   Single variable lopg040 (days lost due to chronic condition only).
@@ -403,13 +525,27 @@ ds1 <- ds0 %>%
       across(all_of(lop_vars), ~ as.numeric(.x)),
       na.rm = TRUE
     ),
-    # Flag respondents where ALL 8 LOP components are NA (truly missing outcome)
+    # Flag respondents where ALL 8 LOP components are NA.
+    # In CCHS skip-patterns this generally indicates no absences (structural zero).
     outcome_all_na = rowSums(is.na(across(all_of(lop_vars)))) == length(lop_vars),
-    days_absent_total = if_else(outcome_all_na, NA_real_, days_absent_total),
+    days_absent_total = if_else(outcome_all_na, 0, days_absent_total),
 
     # Sensitivity outcome: chronic condition days only
     days_absent_chronic = as.numeric(lopg040)
   )
+
+# Enforce valid range for primary outcome (0-90 days).
+# Values outside this range are treated as data quality issues and set to NA.
+invalid_total <- !is.na(ds1$days_absent_total) &
+  (ds1$days_absent_total < 0 | ds1$days_absent_total > 90)
+n_invalid_total <- sum(invalid_total)
+if (n_invalid_total > 0) {
+  warning(sprintf(
+    "%d respondents have days_absent_total outside 0-90 and were set to NA",
+    n_invalid_total
+  ))
+  ds1$days_absent_total[invalid_total] <- NA_real_
+}
 
 cat(sprintf("   ✓ days_absent_total range: %g – %g (n non-NA: %s)\n",
             min(ds1$days_absent_total, na.rm = TRUE),
@@ -420,20 +556,17 @@ cat(sprintf("   ✓ days_absent_chronic range: %g – %g (n non-NA: %s)\n",
             max(ds1$days_absent_chronic, na.rm = TRUE),
             format(sum(!is.na(ds1$days_absent_chronic)), big.mark = ",")))
 
-# Flag if any total > 90 days (stats_instructions_v3 specifies max = 90)
-n_over90 <- sum(ds1$days_absent_total > 90, na.rm = TRUE)
-if (n_over90 > 0) {
-  warning(sprintf("%d respondents have days_absent_total > 90 — verify against data dictionary", n_over90))
-}
-
 # ---- tweak-data-2-exclusions -------------------------------------------------
-cat("\n🔧 Step 2: Apply sequential sample exclusions (Section 3.1)\n")
+cat("\n🔧 Step 2: Sample inclusion mode\n")
 #
-# Exclusion criteria (in order per stats_instructions_v3 Section 3.1):
+# If apply_sample_exclusions=TRUE, apply legacy exclusions (Section 3.1):
 #   1. Age outside 15-75 (dhhgage)
 #   2. Not employed in past 3 months (lop_015 != 1)
 #   3. Proxy respondent (adm_prx == 1)
 #   4. Incomplete outcome or predictor data
+#
+# If apply_sample_exclusions=FALSE (default), retain full pooled sample
+# from ferry output (employed + unemployed + not stated), after white-listing.
 #
 # CCHS DHHGAGE codes (VERIFY against data dictionary):
 #   1=12-14yrs, 2=15-17yrs, 3=18-19yrs, 4=20-24yrs, 5=25-29yrs, 6=30-34yrs,
@@ -457,55 +590,96 @@ predictor_cols <- setdiff(
 n_step <- integer(0)
 n_step["n_start"] <- nrow(ds1)
 
-# Apply sequential filters, tracking counts
-ds2 <- ds1
+# Apply sequential filters only when explicitly requested
+if (isTRUE(apply_sample_exclusions)) {
+  cat("   Mode: legacy exclusions enabled (employment filter applied)\n")
 
-# Step 1: Age 15–75
-# dhhgage codes 2–14 correspond to ages 15–74 (code 15 = 75-79, which includes 75)
-# ADJUST if actual codes differ
-in_age_range <- ds2$dhhgage %in% 2:15   # codes 2=15-17 through 15=75-79
-n_step["n_after_age"] <- sum(in_age_range, na.rm = TRUE)
-ds2 <- ds2 %>% filter(dhhgage %in% 2:15)
+  ds2 <- ds1
 
-# Step 2: Employed in past 3 months
-in_employed <- ds2$lop_015 == 1
-n_step["n_after_employment"] <- sum(in_employed, na.rm = TRUE)
-ds2 <- ds2 %>% filter(lop_015 == 1)
+  # Step 1: Age 15–75
+  # dhhgage codes 2–14 correspond to ages 15–74 (code 15 = 75-79, which includes 75)
+  # ADJUST if actual codes differ
+  in_age_range <- ds2$dhhgage %in% 2:15   # codes 2=15-17 through 15=75-79
+  n_step["n_after_age"] <- sum(in_age_range, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(dhhgage %in% 2:15)
 
-# Step 3: Exclude proxy respondents
-not_proxy <- ds2$adm_prx != 1 | is.na(ds2$adm_prx)
-n_step["n_after_proxy"] <- sum(not_proxy, na.rm = TRUE)
-ds2 <- ds2 %>% filter(adm_prx != 1 | is.na(adm_prx))
+  # Step 2: Employed in past 3 months
+  in_employed <- ds2$lop_015 == 1
+  n_step["n_after_employment"] <- sum(in_employed, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(lop_015 == 1)
 
-# Step 4: Complete outcome (days_absent_total must be non-NA)
-# Additional predictor completeness handled in analysis phase (see missingness section)
-complete_outcome <- !is.na(ds2$days_absent_total)
-n_step["n_after_complete_outcome"] <- sum(complete_outcome, na.rm = TRUE)
-ds2 <- ds2 %>% filter(!is.na(days_absent_total))
+  # Step 3: Exclude proxy respondents
+  not_proxy <- ds2$adm_prx != 1 | is.na(ds2$adm_prx)
+  n_step["n_after_proxy"] <- sum(not_proxy, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(adm_prx != 1 | is.na(adm_prx))
 
-cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
-cat(sprintf("   ✓ After age 15-75:           %s  (-%s excluded)\n",
-            format(n_step["n_after_age"], big.mark = ","),
-            format(n_step["n_start"] - n_step["n_after_age"], big.mark = ",")))
-cat(sprintf("   ✓ After employed filter:     %s  (-%s excluded)\n",
-            format(n_step["n_after_employment"], big.mark = ","),
-            format(n_step["n_after_age"] - n_step["n_after_employment"], big.mark = ",")))
-cat(sprintf("   ✓ After proxy exclusion:     %s  (-%s excluded)\n",
-            format(n_step["n_after_proxy"], big.mark = ","),
-            format(n_step["n_after_employment"] - n_step["n_after_proxy"], big.mark = ",")))
-cat(sprintf("   ✓ After complete outcome:    %s  (-%s excluded)\n",
-            format(n_step["n_after_complete_outcome"], big.mark = ","),
-            format(n_step["n_after_proxy"] - n_step["n_after_complete_outcome"], big.mark = ",")))
+  # Step 4: Complete outcome (days_absent_total must be non-NA)
+  # Additional predictor completeness handled in analysis phase (see missingness section)
+  complete_outcome <- !is.na(ds2$days_absent_total)
+  n_step["n_after_complete_outcome"] <- sum(complete_outcome, na.rm = TRUE)
+  ds2 <- ds2 %>% filter(!is.na(days_absent_total))
 
-# Reference from prior analysis: n_final should be approximately 64,141
+  cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
+  cat(sprintf("   ✓ After age 15-75:           %s  (-%s excluded)\n",
+              format(n_step["n_after_age"], big.mark = ","),
+              format(n_step["n_start"] - n_step["n_after_age"], big.mark = ",")))
+  cat(sprintf("   ✓ After employed filter:     %s  (-%s excluded)\n",
+              format(n_step["n_after_employment"], big.mark = ","),
+              format(n_step["n_after_age"] - n_step["n_after_employment"], big.mark = ",")))
+  cat(sprintf("   ✓ After proxy exclusion:     %s  (-%s excluded)\n",
+              format(n_step["n_after_proxy"], big.mark = ","),
+              format(n_step["n_after_employment"] - n_step["n_after_proxy"], big.mark = ",")))
+  cat(sprintf("   ✓ After complete outcome:    %s  (-%s excluded)\n",
+              format(n_step["n_after_complete_outcome"], big.mark = ","),
+              format(n_step["n_after_proxy"] - n_step["n_after_complete_outcome"], big.mark = ",")))
+} else {
+  cat("   Mode: full pooled sample (no exclusions applied)\n")
+
+  ds2 <- ds1
+  n_step["n_after_age"] <- n_step["n_start"]
+  n_step["n_after_employment"] <- n_step["n_start"]
+  n_step["n_after_proxy"] <- n_step["n_start"]
+  n_step["n_after_complete_outcome"] <- n_step["n_start"]
+
+  cat(sprintf("   ✓ Starting pool:             %s\n", format(n_step["n_start"], big.mark = ",")))
+  cat(sprintf("   ✓ Full pooled retained:      %s  (-0 excluded)\n",
+              format(n_step["n_after_complete_outcome"], big.mark = ",")))
+
+  cat("\n   Employment distribution retained (lop_015):\n")
+  print(ds2 %>%
+          count(lop_015, name = "n") %>%
+          arrange(lop_015))
+}
+
+cat("\n   Cycle counts after exclusions:\n")
+print(ds2 %>%
+        count(cycle, name = "n") %>%
+        arrange(cycle))
+
+if (sum(ds2$cycle == 0L, na.rm = TRUE) == 0L || sum(ds2$cycle == 1L, na.rm = TRUE) == 0L) {
+  msg <- paste0(
+    "Cycle integrity check after exclusions: one cycle has 0 rows.\n",
+    "Verify variable coding consistency across cycles (especially dhhgage, lop_015, adm_prx, LOP outcomes)."
+  )
+  if (strict_cycle_integrity) {
+    stop(msg)
+  } else {
+    warning(msg)
+  }
+}
+
 n_final <- nrow(ds2)
 cat(sprintf("\n   Final analytical sample: %s\n", format(n_final, big.mark = ",")))
-cat(sprintf("   Reference (prior analysis): 64,141\n"))
-if (abs(n_final - 64141) > 5000) {
-  warning(sprintf(
-    "Final sample size (%d) differs from reference (64,141) by >5,000.\nVerify exclusion variable codes against data dictionaries.",
-    n_final
-  ))
+if (isTRUE(apply_sample_exclusions)) {
+  cat(sprintf("   Reference (legacy exclusions): 64,141\n"))
+  if (abs(n_final - 64141) > 5000) {
+    warning(sprintf(
+      "Final sample size (%d) differs from reference (64,141) by >5,000.\nVerify exclusion variable codes against data dictionaries.",
+      n_final
+    ))
+  }
+} else {
+  cat(sprintf("   Reference mode: full pooled sample from ferry output (employment not filtered)\n"))
 }
 
 # Build sample_flow table (for reproducing Figure 1 flowchart)
@@ -519,10 +693,10 @@ sample_flow <- tibble::tibble(
   ),
   description = c(
     "Starting pool (both CCHS cycles pooled)",
-    "Exclude respondents outside age 15-75",
-    "Exclude respondents not employed (past 3 months)",
-    "Exclude proxy respondents",
-    "Exclude respondents with missing outcome (days absent)"
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents outside age 15-75" else "No exclusion applied (full pooled sample mode)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents not employed (past 3 months)" else "No exclusion applied (employment retained)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude proxy respondents" else "No exclusion applied (proxy retained)",
+    if (isTRUE(apply_sample_exclusions)) "Exclude respondents with missing outcome (days absent)" else "No exclusion applied (outcome missingness retained)"
   ),
   n_remaining = as.integer(n_step),
   n_excluded  = as.integer(c(
@@ -553,6 +727,16 @@ cat("\n🔧 Step 3: Factor recoding\n")
 #   8=Refusal, 9=Not stated are mapped to NA throughout.
 
 special_na_codes <- c(6, 7, 8, 9, 96, 97, 98, 99)
+
+# Inferred recode source variables may be absent in one/both cycles.
+# Ensure they exist as NA columns so mutate()/case_when() never fails.
+recode_source_vars <- c(
+  "dhhgage", "dhh_sex", "dhhgms", "edudh04", "sdcfimm", "sdcdgcb",
+  "incdghh", "hcu_1aa", "lbfdghp", "lbfdgft", "alcdgtyp", "smkdsty",
+  "hwtdgbmi", "pacdpai", "gen_01", "gen_02a", "gen_09", "rac_1", "inj_01"
+)
+
+ds2 <- ensure_columns(ds2, recode_source_vars, context_label = "factor recoding inputs")
 
 ds3 <- ds2 %>%
   mutate(
@@ -1138,8 +1322,8 @@ cat("   1. Review white-list miss warnings above (if any)\n")
 cat("      → Open PDF data dictionaries in ./data-private/raw/2026-02-19/\n")
 cat("      → Update INFERRED variable names in declare-globals section\n")
 cat("   2. Confirm DHHGAGE age codes match your data dictionary (currently 2-15)\n")
-cat("   3. Confirm LOP_015 employment code (currently: 1=Yes employed)\n")
-cat("   4. Confirm ADM_PRX proxy code (currently: 1=Proxy → exclude)\n")
+cat("   3. Confirm LOP_015 employment coding (retained as raw; no employment exclusion in default mode)\n")
+cat("   4. Confirm ADM_PRX proxy coding (retained as raw; proxy exclusion only when apply_sample_exclusions=TRUE)\n")
 cat("   5. Verify CCC variable names match the 19 conditions in thesis Appendix 3\n")
 cat("   6. Check outcome distribution vs reference (mean≈1.35, 70.59% zeros)\n")
 
