@@ -26,9 +26,10 @@ jobs:
         uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Render site (frozen outputs only — no R runtime needed)
-        run: quarto render --no-execute
-        # --no-execute skips code execution and relies entirely on _freeze/ cached outputs.
-        # To rebuild EDA outputs: render locally with R + private data, commit _freeze/, then push.
+        run: quarto render
+        # freeze: auto (set in _quarto.yml) uses cached _freeze/ outputs when hash matches.
+        # No R needed on CI as long as _freeze/ is up-to-date and committed.
+        # To rebuild outputs: render locally with R + private data, commit _freeze/, then push.
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
