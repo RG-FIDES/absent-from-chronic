@@ -3,7 +3,8 @@
 Human decisions and reasoning.
 
 ---
-
+# 2026-03-01
+Created EDA-3 to observe the same relationships as in EDA-2 (g1-g7 graph families, same demographic breakdowns) but using `absence_days_chronic` (days missed due to a chronic condition) instead of `absence_days_total`. Source: `cchs_employed` table in `cchs-3.sqlite`. Files created: `analysis/eda-3/eda-3.R`, `analysis/eda-3/eda-3.qmd`, `analysis/eda-3/README.md`.
 # 2026-02-25
 
 We are going to complete the flow.R, add some tasks to be able to run each eda-\*.R files. Creating the UI and UX desing in format of the website which will contain all main pages, information about the data, analyzing sections (eda) and author etc. Setting the workflow tasks.

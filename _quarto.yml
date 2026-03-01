@@ -10,6 +10,7 @@ project:
     - pages/authors.qmd
     - analysis/eda-1/eda-1.qmd
     - analysis/eda-2/eda-2.qmd
+    - analysis/eda-3/eda-3.qmd
 
 execute:
   freeze: auto   # use cached results; re-run only when source changes
@@ -28,6 +29,8 @@ website:
             text: "EDA 1 — Vehicle Performance (Template)"
           - href: analysis/eda-2/eda-2.qmd
             text: "EDA 2 — Work Absence (CCHS)"
+          - href: analysis/eda-3/eda-3.qmd
+            text: "EDA 3 — Chronic Absence (CCHS)"
       - href: pages/data.qmd
         text: Data
       - href: pages/pipeline.qmd
