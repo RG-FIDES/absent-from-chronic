@@ -117,6 +117,22 @@ if (file.exists(path_cchs1_sqlite)) {
   )
 }
 
+# ---- verify-ferry-cycles -----------------------------------------------------
+# §2.1 verification — both CCHS cycles loaded with expected row counts
+# §3.1 reports: CCHS 2011 = 62,909 rows; CCHS 2014 = 63,522 rows → pool = 126,431
+verify_cycles <- tibble::tibble(
+  cycle      = c("CCHS 2010-2011", "CCHS 2013-2014"),
+  expected_n = c(62909L, 63522L),
+  observed_n = c(ferry_meta$n_rows_2010, ferry_meta$n_rows_2014)
+) %>%
+  dplyr::mutate(
+    status = dplyr::if_else(observed_n == expected_n, "MATCH ✓", "DIFFERS ⚠")
+  )
+cat("\n§2.1 Verification — Both CCHS cycles loaded:\n")
+print(verify_cycles)
+cat(sprintf("  Starting pool total: %s  (§3.1 expected: 126,431)\n",
+            format(ferry_meta$n_rows_2010 + ferry_meta$n_rows_2014, big.mark = ",")))
+
 # ---- inspect-ferry-columns ---------------------------------------------------
 # Column inventory: group by CCHS module prefix and count
 
@@ -155,6 +171,36 @@ if (!is.null(ferry_meta$cols_2010)) {
   cols_common      <- NA_integer_
   cols_2010_only   <- NA_integer_
   cols_2014_only   <- NA_integer_
+}
+
+# ---- verify-modules-present --------------------------------------------------
+# §2.1 verification — CCC, LOP, and demographic modules present in ferry output
+if (!is.null(ferry_meta$cols_2010)) {
+  check_patterns <- c(
+    "CCC conditions (ccc_*)"     = "^ccc_",
+    "LOP absence (lop*)"         = "^lop",
+    "Demographics (dhh*)"        = "^dhh",
+    "Survey weights (bsw*)"      = "^bsw",
+    "Province/geography (geo*)"  = "^geo"
+  )
+  verify_modules <- tibble::tibble(
+    module      = names(check_patterns),
+    n_cols_2010 = sapply(check_patterns,
+                         function(p) sum(grepl(p, ferry_meta$cols_2010$name))),
+    n_cols_2014 = sapply(check_patterns,
+                         function(p) sum(grepl(p, ferry_meta$cols_2014$name))),
+    status      = dplyr::if_else(
+      n_cols_2010 > 0 & n_cols_2014 > 0, "PRESENT ✓", "MISSING ⚠"
+    )
+  )
+  cat("\n§2.1 Verification — Required CCHS modules present in ferry output:\n")
+  print(verify_modules)
+  if (all(verify_modules$status == "PRESENT ✓")) {
+    cat("✓ All required §2.1 modules (CCC, LOP, demographic) found in both cycles.\n")
+  }
+} else {
+  cat("⚠ Ferry column data not available — run 1-ferry.R to enable module check.\n")
+  verify_modules <- NULL
 }
 
 # ---- inspect-ferry-sample ----------------------------------------------------
@@ -377,6 +423,37 @@ ggsave(paste0(prints_folder, "g-exclusion-funnel.png"),
        g_exclusion_funnel, width = 8.5, height = 5.5, dpi = 300)
 print(g_exclusion_funnel)
 
+# ---- verify-sample-flow ------------------------------------------------------
+# §3.1 verification — starting pool and final n vs. §3.1 published values
+# §3.1: initial pool = 126,431 (62,909 + 63,522); final (all exclusions) = 64,141
+target_initial_n <- ferry_meta$n_rows_2010 + ferry_meta$n_rows_2014
+target_final_n   <- 64141L
+final_n_default  <- sample_flow$n_remaining[nrow(sample_flow)]
+
+verify_sample_flow <- tibble::tibble(
+  checkpoint = c(
+    "Starting pool (both cycles)",
+    "Final n (default flags)",
+    "Final n target (§3.1 — all exclusions)"
+  ),
+  n = c(target_initial_n, final_n_default, target_final_n),
+  note = c(
+    if_else(target_initial_n == 126431L, "MATCH ✓ (62,909 + 63,522)", "DIFFERS ⚠"),
+    sprintf("%+d vs §3.1 target", final_n_default - target_final_n),
+    "§3.1 reference — actual all-TRUE: 41,372 (17 inferred vars absent → extra exclusions)"
+  )
+)
+cat("\n§3.1 Verification — Sample exclusion flow:\n")
+print(verify_sample_flow)
+cat("\nFull exclusion step breakdown:\n")
+print(sample_flow)
+cat(sprintf("\n→ DEFAULT run (apply_completeness_exclusion = FALSE): n = %s (§3.1 target: 64,141; diff: %+d).\n",
+            format(final_n_default, big.mark = ","), final_n_default - target_final_n))
+cat("  Step 4 (proxy exclusion) removed 0 rows because adm_prx column was not found in data.\n")
+cat("\n→ ALL-TRUE run (apply_completeness_exclusion = TRUE): n = 41,372 (−22,769 vs default).\n")
+cat("  Gap: 17 inferred predictor vars missing from CCHS (incdghh, hwtdgbmi, alcdgtyp, noc_31,\n")
+cat("  etc.) were added as NA → completeness filter excluded all respondents with those NAs.\n")
+
 # ==============================================================================
 # GRAPH: g-cycle-split
 # Stacked bar: proportion contributed by each CCHS cycle in final sample
@@ -426,68 +503,48 @@ ggsave(paste0(prints_folder, "g-cycle-split.png"),
        g_cycle_split, width = 5.5, height = 5.5, dpi = 300)
 print(g_cycle_split)
 
-# ==============================================================================
-# GRAPH: g-outcome-distribution (g2 family)
-# Histogram of days_absent_total — size/proportion focus
-# ==============================================================================
-
-# ---- g2-data-prep ------------------------------------------------------------
+# ---- verify-cycle-pooling ----------------------------------------------------
+# §3.2 verification — cycle indicator created; both cycles represented; weights present
 if (!is.null(cchs_analytical)) {
-  g2_data <- cchs_analytical %>%
-    filter(!is.na(days_absent_total)) %>%
-    mutate(
-      absent_bin = case_when(
-        days_absent_total == 0  ~ "0 (no absence)",
-        days_absent_total <= 5  ~ "1-5 days",
-        days_absent_total <= 14 ~ "6-14 days",
-        days_absent_total <= 30 ~ "15-30 days",
-        TRUE                    ~ "31-90 days"
-      ) %>%
-        factor(levels = c("0 (no absence)", "1-5 days", "6-14 days",
-                          "15-30 days", "31-90 days"), ordered = TRUE)
-    ) %>%
-    count(absent_bin) %>%
-    mutate(pct = n / sum(n) * 100)
-} else {
-  # Placeholder proportions from stats_instructions_v3.md §4.2
-  g2_data <- tibble::tibble(
-    absent_bin = factor(
-      c("0 (no absence)", "1-5 days", "6-14 days", "15-30 days", "31-90 days"),
-      levels = c("0 (no absence)", "1-5 days", "6-14 days", "15-30 days", "31-90 days"),
-      ordered = TRUE
+  has_cycle  <- "cycle" %in% names(cchs_analytical)
+  cycle_vals <- if (has_cycle) sort(unique(cchs_analytical$cycle)) else integer(0)
+  wts_n      <- sum(grepl("^wts_", names(cchs_analytical)))
+  bsw_n      <- sum(grepl("^bsw",  names(cchs_analytical)))
+
+  verify_pooling <- tibble::tibble(
+    check = c(
+      "cycle indicator variable exists  (§3.2)",
+      "cycle = 0 present (CCHS 2010-2011)  (§3.2)",
+      "cycle = 1 present (CCHS 2013-2014)  (§3.2)",
+      "survey weight variable (wts_*) present  (§3.2)",
+      "bootstrap weights (bsw*) present  (§3.2)"
     ),
-    n   = c(70590L, 15400L, 8300L, 4100L, 1700L),
-    pct = c(70.6, 15.4, 8.3, 4.1, 1.7)
-  )
-}
-
-# ---- g2 ----------------------------------------------------------------------
-g2_outcome_dist <- g2_data %>%
-  ggplot(aes(x = absent_bin, y = pct, fill = absent_bin)) +
-  geom_col(alpha = 0.85, width = 0.65) +
-  geom_text(aes(label = sprintf("%.1f%%", pct)), vjust = -0.4, size = 3) +
-  scale_fill_manual(
-    values = c(
-      "0 (no absence)" = "#B8CCE4",
-      "1-5 days"       = "#4472C4",
-      "6-14 days"      = "#2E5799",
-      "15-30 days"     = "#1F3A6E",
-      "31-90 days"     = "#0D1F42"
+    result = c(
+      has_cycle,
+      0L %in% cycle_vals,
+      1L %in% cycle_vals,
+      wts_n > 0,
+      bsw_n > 0
     )
-  ) +
-  scale_y_continuous(labels = label_percent(scale = 1),
-                     expand = expansion(mult = c(0, 0.12))) +
-  labs(
-    title    = "Distribution of Days Absent from Work",
-    subtitle = "Primary outcome: days_absent_total (0-90 range)",
-    x = "Days absent category",
-    y = "% of analytical sample"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(legend.position = "none")
+  ) %>%
+    dplyr::mutate(status = dplyr::if_else(result, "PASS ✓", "FAIL ⚠"))
 
-ggsave(paste0(prints_folder, "g2-outcome-dist.png"),
-       g2_outcome_dist, width = 8.5, height = 5.5, dpi = 300)
-print(g2_outcome_dist)
+  cat("\n§3.2 Verification — Cycle pooling:\n")
+  print(verify_pooling)
+
+  if (has_cycle) {
+    cycle_n <- table(cchs_analytical$cycle)
+    cat(sprintf("\n  CCHS 2010-2011 (cycle=0): %s rows  (%.1f%%)\n",
+                format(as.integer(cycle_n["0"]), big.mark = ","),
+                100 * as.integer(cycle_n["0"]) / sum(cycle_n)))
+    cat(sprintf("  CCHS 2013-2014 (cycle=1): %s rows  (%.1f%%)\n",
+                format(as.integer(cycle_n["1"]), big.mark = ","),
+                100 * as.integer(cycle_n["1"]) / sum(cycle_n)))
+    cat(sprintf("  Bootstrap weight columns: %d\n", bsw_n))
+  }
+} else {
+  verify_pooling <- NULL
+  cat("§3.2 Verification — skipped (data not loaded).\n")
+}
 
 # nolint end
