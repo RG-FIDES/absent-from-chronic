@@ -3,6 +3,9 @@
 Human decisions and reasoning.
 
 ---
+
+# 2026-03-05
+Restructuring the ellis pipeline, and the logic of the eda folders. Creating eda report where will be described the completed tasks from the `statistics_insturcitons_v3.md` file. In the eda-2.qmd will be described the completed taks from 2-1 to 3-2.
 # 2026-03-01
 Created EDA-3 to observe the same relationships as in EDA-2 (g1-g7 graph families, same demographic breakdowns) but using `absence_days_chronic` (days missed due to a chronic condition) instead of `absence_days_total`. Source: `cchs_employed` table in `cchs-3.sqlite`. Files created: `analysis/eda-3/eda-3.R`, `analysis/eda-3/eda-3.qmd`, `analysis/eda-3/README.md`.
 # 2026-02-25
