@@ -157,3 +157,4 @@ analysis/*/data-local/
 _site/
 absent-from-chronic-oleksandkov.code-workspace
 .Rprofile
+_freeze/analysis/eda-2/eda-2/execute-results/html.json
