@@ -28,8 +28,8 @@ CCHS .sav files (data-private/raw/)
 | 1 | `manipulation/1-ferry.R` | Ferry | `data-private/derived/cchs-1.sqlite` + `cchs-1-raw/` Parquet backup |
 | 2 | `manipulation/2-ellis.R` | Ellis | `data-private/derived/cchs-2.sqlite` + `cchs-2-tables/` Parquet |
 | 3 | `manipulation/2-test-ellis-cache.R` | Test | Console test report (three-way alignment check) |
-| — | `manipulation/ferry-lane-example.R` | Example | `cchs-1.sqlite` (demo only; does not affect main pipeline) |
-| — | `manipulation/ellis-lane-example.R` | Example | `cchs-2.sqlite` (demo only; does not affect main pipeline) |
+| — | `manipulation/example/ferry-lane-example.R` | Example | `cchs-1.sqlite` (demo only; does not affect main pipeline) |
+| — | `manipulation/example/ellis-lane-example.R` | Example | `cchs-2.sqlite` (demo only; does not affect main pipeline) |
 
 > **Note on Ellis Lane 3**: Derived output directories `cchs-3-tables/` and `cchs-3.sqlite`
 > exist in `data-private/derived/` from a prior run of a clarity-layer script.
