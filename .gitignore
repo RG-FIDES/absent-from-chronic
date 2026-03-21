@@ -165,3 +165,13 @@ _freeze/analysis/eda-2/eda-2/execute-results/html.json
 **/execute-results/html.json
 _freeze/analysis/eda-1/eda-1/execute-results/html.json
 _freeze/analysis/eda-2/eda-2/execute-results/html.json
+
+/.venv/
+/analysis/eda-2/eda-2_files/
+/analysis/eda-2/*.png
+/analysis/eda-2/figure-png-iso/*.png
+analysis/eda-2/figure-png-iso/g-cycle-split-1.png
+analysis/eda-2/figure-png-iso/g-cycle-split-1.png
+analysis/eda-2/figure-png-iso/g-exclusion-funnel-1.png
+analysis/eda-2/figure-png-iso/g-ferry-size-1.png
+analysis/eda-2/figure-png-iso/g-whitelist-ratio-1.png
