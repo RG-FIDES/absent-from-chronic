@@ -22,7 +22,7 @@ Replication of statistical analysis
 | `data-private/derived/cchs-3-tables/` | Clarity-layer splits: `cchs_employed.parquet`, `cchs_unemployed.parquet`, `data_dictionary.parquet` |
 | `data-private/derived/cchs-3.sqlite` | SQLite version of Lane 3 outputs |
 
-See `data-private/contents.md` and `data-public/metadata/CACHE-manifest.md` for detailed descriptions.
+See `data-public/metadata/CACHE-manifest.md` for detailed descriptions.
 
 ### Running the data pipeline (`manipulation/`)
 
