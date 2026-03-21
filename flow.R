@@ -136,6 +136,15 @@ ds_rail  <- tibble::tribble(
   ~fx         , ~path,
 
   # ===============================
+  # PHASE 0: METADATA EXTRACTION
+  # ===============================
+  # Reads raw SAV files (labels preserved) and writes the authoritative codebook
+  # to data-public/derived/cchs-metadata/.  Run once; re-run if SAV files change.
+  # Outputs are the source-of-truth for variable/value code decisions in Ellis.
+
+  "run_r"     , "manipulation/extract-metadata.R",     # Codebook: SAV metadata → cchs_variable_labels.csv + cchs_value_labels.csv
+
+  # ===============================
   # PHASE 1: DATA MANIPULATION
   # ===============================
 
