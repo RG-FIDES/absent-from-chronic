@@ -152,7 +152,7 @@ ds_rail  <- tibble::tribble(
   "run_r"     , "manipulation/2-ellis.R",              # Ellis Lane 2: white-list + recode → cchs-2.sqlite + Parquet
   # "run_r"     , "manipulation/3-ellis.R",              # Ellis Lane 3: clarity layer + splits → cchs-3.sqlite + Parquet
  # "run_r_soft", "manipulation/2-test-ellis-cache.R",   # Ellis validation (non-blocking in flow)
-  # "run_r_soft", "manipulation/ellis-lane-example.R",   # Ellis pattern example (non-blocking in flow)
+  # "run_r_soft", "manipulation/example/ellis-lane-example.R",   # Ellis pattern example (non-blocking in flow)
   
   # ===============================
   # PHASE 2: ANALYSIS SCRIPTS
