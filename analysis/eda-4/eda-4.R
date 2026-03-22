@@ -702,4 +702,304 @@ ggsave(
   dpi    = 300
 )
 print(g31_lop_cooccurrence)
+
+# ============================================================================
+# ANALYSIS-POSITRON: Outcome variable and its components — six graph families
+# gB1  Prevalence of each absence reason (horizontal bar, full sample)
+# gB2  Distribution of days_absent_total — non-zeros only, log y-scale
+# gB3  Side-by-side: total vs. chronic-only (log y-scale, faceted)
+# gB4  Mean & median days per reason among reporters
+# gB5  Role of chronic absence among those with any absence (3-group bar)
+# gB6  Scatter of chronic days vs total days (bubble chart, 1:1 line)
+# ============================================================================
+
+# ---- gB1-data-prep -----------------------------------------------------------
+# Prevalence of each absence reason: % of full sample with ≥1 day, by reason
+
+gB1_data <- ds_lop_long %>%
+  group_by(reason_label) %>%
+  summarise(
+    n_total      = n(),
+    wt_total     = sum(.data[[weight_col]], na.rm = TRUE),
+    wt_positive  = sum(.data[[weight_col]][has_days],  na.rm = TRUE),
+    pct_weighted = wt_positive / wt_total * 100,
+    .groups = "drop"
+  ) %>%
+  mutate(reason_label = forcats::fct_reorder(reason_label, pct_weighted))
+
+# ---- gB1 ---------------------------------------------------------------------
+# Horizontal bar: weighted % of full sample reporting ≥1 day per reason
+
+gB1_reason_prevalence <- gB1_data %>%
+  ggplot(aes(x = pct_weighted, y = reason_label)) +
+  geom_col(fill = "#2c7bb6", alpha = 0.85) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct_weighted)),
+    hjust = -0.1, size = 3.2
+  ) +
+  scale_x_continuous(
+    labels = label_percent(scale = 1),
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  labs(
+    title    = "gB1: Prevalence of each absence reason (full analytical sample)",
+    subtitle = "Weighted % of all respondents reporting ≥1 absent day for each health reason",
+    x        = "Weighted % of respondents with ≥1 day absent",
+    y        = NULL,
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.y = element_blank())
+
+ggsave(
+  paste0(prints_folder, "gB1_reason_prevalence.png"),
+  gB1_reason_prevalence,
+  width  = 8.5,
+  height = 5.5,
+  dpi    = 300
+)
+print(gB1_reason_prevalence)
+
+# ---- gB2-data-prep -----------------------------------------------------------
+# Distribution of days_absent_total restricted to non-zero values, for log-bar chart
+
+n_total_obs  <- nrow(ds0)
+n_zero_obs   <- sum(ds0$days_absent_total == 0, na.rm = TRUE)
+pct_zero     <- n_zero_obs / n_total_obs * 100
+
+gB2_data <- ds0 %>%
+  filter(!is.na(days_absent_total), days_absent_total >= 1) %>%
+  count(days_absent_total, name = "n_respondents")
+
+# ---- gB2 ---------------------------------------------------------------------
+# Bar chart: days_absent_total (non-zeros), log y-scale, one bar per integer value
+
+gB2_days_total_dist <- gB2_data %>%
+  ggplot(aes(x = days_absent_total, y = n_respondents)) +
+  geom_col(fill = "#4575b4", alpha = 0.80, width = 0.85) +
+  scale_y_log10(
+    labels = label_comma(),
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 30, 45, 60, 75, 90)) +
+  labs(
+    title    = sprintf(
+      "gB2: Distribution of total absent days (non-zeros only, log y-scale)\n%s zeros excluded (%.1f%% of full sample)",
+      scales::comma(n_zero_obs), pct_zero
+    ),
+    subtitle = "One bar per integer value of days_absent_total",
+    x        = "Total absent days (days_absent_total)",
+    y        = "Number of respondents (log scale)",
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank())
+
+ggsave(
+  paste0(prints_folder, "gB2_days_total_dist.png"),
+  gB2_days_total_dist,
+  width  = 8.5,
+  height = 5.5,
+  dpi    = 300
+)
+print(gB2_days_total_dist)
+
+# ---- gB3-data-prep -----------------------------------------------------------
+# Side-by-side: days_absent_total vs days_absent_chronic (non-zeros, log y)
+
+gB3_data <- bind_rows(
+  ds0 %>%
+    filter(!is.na(days_absent_total), days_absent_total >= 1) %>%
+    mutate(outcome = "Total absent days\n(days_absent_total)",
+           value   = days_absent_total),
+  ds0 %>%
+    filter(!is.na(days_absent_chronic), days_absent_chronic >= 1) %>%
+    mutate(outcome = "Chronic-condition only\n(days_absent_chronic)",
+           value   = days_absent_chronic)
+) %>%
+  count(outcome, value, name = "n_respondents") %>%
+  mutate(outcome = factor(outcome,
+                          levels = c("Total absent days\n(days_absent_total)",
+                                     "Chronic-condition only\n(days_absent_chronic)")))
+
+# ---- gB3 ---------------------------------------------------------------------
+# Faceted log-scale histograms: total vs chronic-only distributions
+
+gB3_total_vs_chronic <- gB3_data %>%
+  ggplot(aes(x = value, y = n_respondents)) +
+  geom_col(fill = "#4575b4", alpha = 0.80, width = 0.85) +
+  scale_y_log10(labels = label_comma(), expand = expansion(mult = c(0, 0.1))) +
+  scale_x_continuous(breaks = c(1, 5, 10, 20, 30, 60, 90)) +
+  facet_wrap(~ outcome, ncol = 2, scales = "free_x") +
+  labs(
+    title    = "gB3: Distributions of total vs. chronic-only absent days (non-zeros, log y)",
+    subtitle = "Chronic-only is narrower and more concentrated; total reflects all 8 reasons",
+    x        = "Days absent",
+    y        = "Number of respondents (log scale)",
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank())
+
+ggsave(
+  paste0(prints_folder, "gB3_total_vs_chronic.png"),
+  gB3_total_vs_chronic,
+  width  = 8.5,
+  height = 5.5,
+  dpi    = 300
+)
+print(gB3_total_vs_chronic)
+
+# ---- gB4-data-prep -----------------------------------------------------------
+# Mean and median days per reason, computed only among reporters (non-null, >0)
+
+gB4_data <- ds_lop_long %>%
+  filter(has_days) %>%
+  group_by(reason_label) %>%
+  summarise(
+    mean_days   = mean(days_reason, na.rm = TRUE),
+    median_days = median(days_reason, na.rm = TRUE),
+    n_reporters = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(reason_label = forcats::fct_reorder(reason_label, mean_days))
+
+# ---- gB4 ---------------------------------------------------------------------
+# Horizontal bar (mean) + point overlay (median), among reporters only
+
+gB4_mean_days_per_reason <- gB4_data %>%
+  ggplot(aes(x = mean_days, y = reason_label)) +
+  geom_col(fill = "#2c7bb6", alpha = 0.75, width = 0.65) +
+  geom_point(aes(x = median_days), colour = "#d73027", size = 3.5, shape = 18) +
+  geom_text(
+    aes(label = sprintf("mean=%.1f  med=%.0f", mean_days, median_days)),
+    hjust = -0.05, size = 3.0
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.30))) +
+  labs(
+    title    = "gB4: Mean (bar) and median (diamond) days absent per reason — reporters only",
+    subtitle = "Restricted to respondents reporting ≥1 day for that reason; skew visible as mean >> median",
+    x        = "Days absent (among reporters of that reason)",
+    y        = NULL,
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.y = element_blank())
+
+ggsave(
+  paste0(prints_folder, "gB4_mean_days_per_reason.png"),
+  gB4_mean_days_per_reason,
+  width  = 8.5,
+  height = 5.5,
+  dpi    = 300
+)
+print(gB4_mean_days_per_reason)
+
+# ---- gB5-data-prep -----------------------------------------------------------
+# Among respondents with days_absent_total > 0, classify by chronic role:
+#   A) Zero chronic days (non-chronic absence only)
+#   B) Entirely chronic (days_absent_chronic == days_absent_total)
+#   C) Mixed (some chronic + some other reasons)
+
+gB5_data <- ds0 %>%
+  filter(!is.na(days_absent_total), days_absent_total > 0) %>%
+  mutate(
+    chr   = ifelse(is.na(days_absent_chronic), 0, days_absent_chronic),
+    group = case_when(
+      chr == 0                          ~ "No chronic days\n(non-chronic absence only)",
+      chr == days_absent_total          ~ "All chronic\n(chronic = total)",
+      TRUE                              ~ "Mixed\n(some chronic + other reasons)"
+    ),
+    group = factor(group, levels = c(
+      "No chronic days\n(non-chronic absence only)",
+      "Mixed\n(some chronic + other reasons)",
+      "All chronic\n(chronic = total)"
+    ))
+  ) %>%
+  count(group) %>%
+  mutate(pct = n / sum(n) * 100)
+
+# ---- gB5 ---------------------------------------------------------------------
+# Bar chart: three chronic-role groups among absent respondents
+
+gB5_chronic_role <- gB5_data %>%
+  ggplot(aes(x = group, y = pct, fill = group)) +
+  geom_col(width = 0.6, alpha = 0.85) +
+  geom_text(
+    aes(label = sprintf("%.1f%%\n(n = %s)", pct, scales::comma(n))),
+    vjust = -0.3, size = 3.5
+  ) +
+  scale_y_continuous(
+    labels = label_percent(scale = 1),
+    expand = expansion(mult = c(0, 0.20))
+  ) +
+  scale_fill_manual(values = c("#74add1", "#f46d43", "#d73027"),
+                    guide  = "none") +
+  labs(
+    title    = "gB5: Role of chronic absence among respondents with any absence",
+    subtitle = "Three-group classification: no chronic days / mixed / entirely chronic",
+    x        = NULL,
+    y        = "% of respondents with ≥1 absent day",
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.x = element_blank())
+
+ggsave(
+  paste0(prints_folder, "gB5_chronic_role.png"),
+  gB5_chronic_role,
+  width  = 8.5,
+  height = 5.5,
+  dpi    = 300
+)
+print(gB5_chronic_role)
+
+# ---- gB6-data-prep -----------------------------------------------------------
+# Bubble chart: chronic days vs total days (both > 0)
+# Each bubble = unique (total, chronic) combination; size ∝ n respondents
+
+gB6_data <- ds0 %>%
+  filter(!is.na(days_absent_total), days_absent_total > 0,
+         !is.na(days_absent_chronic), days_absent_chronic > 0) %>%
+  count(days_absent_total, days_absent_chronic, name = "n_combo")
+
+# Diagonal extent for 1:1 reference line
+gB6_max_axis <- max(gB6_data$days_absent_total, gB6_data$days_absent_chronic)
+
+# ---- gB6 ---------------------------------------------------------------------
+# Bubble chart: chronic vs total days absent, 1:1 reference line
+
+gB6_chronic_vs_total <- gB6_data %>%
+  ggplot(aes(x = days_absent_total, y = days_absent_chronic, size = n_combo)) +
+  geom_abline(slope = 1, intercept = 0, colour = "grey50", linetype = "dashed",
+              linewidth = 0.7) +
+  geom_point(alpha = 0.55, colour = "#4575b4") +
+  scale_size_continuous(
+    name   = "# respondents\nat combination",
+    range  = c(1, 12),
+    labels = label_comma()
+  ) +
+  scale_x_continuous(breaks = c(1, 5, 10, 20, 30, 60, 90)) +
+  scale_y_continuous(breaks = c(1, 5, 10, 20, 30, 60, 90)) +
+  coord_fixed(xlim = c(0, gB6_max_axis), ylim = c(0, gB6_max_axis)) +
+  annotate("text", x = gB6_max_axis * 0.7, y = gB6_max_axis * 0.78,
+           label = "chronic = total\n(1:1 line)",
+           colour = "grey40", size = 3.2, hjust = 0) +
+  labs(
+    title    = "gB6: Chronic days vs. total days absent — bubble chart (both > 0)",
+    subtitle = "Points on the dashed 1:1 line: all absence is chronic. Points below: mix of chronic + other reasons.",
+    x        = "Total absent days (days_absent_total)",
+    y        = "Chronic-condition absent days (days_absent_chronic)",
+    caption  = "Source: CCHS 2010–11 & 2013–14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 11)
+
+ggsave(
+  paste0(prints_folder, "gB6_chronic_vs_total.png"),
+  gB6_chronic_vs_total,
+  width  = 7.0,
+  height = 7.0,
+  dpi    = 300
+)
+print(gB6_chronic_vs_total)
 # nolint end

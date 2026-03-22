@@ -313,6 +313,142 @@ For complete data documentation, see the [Data Primer](../data-primer-1/data-pri
 #| fig-cap: "Cell values show % of respondents reporting ≥1 day for both reasons in the row/column pair. Diagonal entries equal univariate prevalence."
 ```
 
+# Analysis-Positron
+
+This section characterises the outcome variable (`days_absent_total`) and its primary chronic-condition component (`days_absent_chronic`) through six complementary visualisations. Together they address: how common each reason is, how many days each reason typically produces, how the full distribution of total absence looks, how total and chronic-only compare, and what structural role the chronic component plays relative to the total.
+
+## gB1 — Prevalence of Each Absence Reason
+
+**Question**: What percentage of the full sample reported at least one absent day for each of the eight reasons?
+
+```{r}
+#| label: gB1-data-prep
+#| code-summary: Weighted prevalence per reason (full sample)
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB1
+#| code-summary: Horizontal bar chart — weighted prevalence by reason
+#| echo: true
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Weighted % of all respondents reporting ≥1 absent day per health reason. Establishes which reasons are most prevalent in the population, independent of days produced."
+```
+
+## gB2 — Distribution of Total Absent Days (non-zeros, log y)
+
+**Question**: What does the distribution of `days_absent_total` look like among those who missed at least one day?
+
+```{r}
+#| label: gB2-data-prep
+#| code-summary: Filter non-zero total days; count by integer value
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB2
+#| code-summary: Bar chart — days_absent_total distribution, log y-scale
+#| echo: true
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "One bar per integer value of days_absent_total (non-zeros only). Log y-axis reveals the heavy right tail. Title annotates the number and percentage of zeros excluded."
+```
+
+## gB3 — Total vs. Chronic-Only Distributions (log y, faceted)
+
+**Question**: How does the distribution of `days_absent_chronic` compare to `days_absent_total`?
+
+```{r}
+#| label: gB3-data-prep
+#| code-summary: Faceted long-form data for total vs chronic comparison
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB3
+#| code-summary: Faceted log-y bar charts — total vs chronic distributions
+#| echo: true
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Side-by-side distributions of days_absent_total and days_absent_chronic (non-zeros, log y). Chronic-only is narrower and more concentrated since it represents one of eight reasons."
+```
+
+## gB4 — Mean and Median Days Absent per Reason (reporters only)
+
+**Question**: Among those who reported a given reason, how many days did that reason typically produce?
+
+```{r}
+#| label: gB4-data-prep
+#| code-summary: Mean and median days per reason, restricted to reporters
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB4
+#| code-summary: Horizontal bar (mean) + diamond overlay (median)
+#| echo: true
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Mean (bar) and median (red diamond) days absent per reason, computed only among respondents who reported that reason. Mean >> median signals right-skewed distributions."
+```
+
+## gB5 — Role of Chronic Absence Among Those With Any Absence
+
+**Question**: Among workers who missed at least one day, how central is the chronic-condition component?
+
+```{r}
+#| label: gB5-data-prep
+#| code-summary: Classify absent respondents into three chronic-role groups
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB5
+#| code-summary: Bar chart — three chronic-role groups
+#| echo: true
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Proportions of the absent subgroup (days_absent_total > 0) classified as: no chronic days, entirely chronic, or mixed. Frames how central the chronic component is among absent workers."
+```
+
+## gB6 — Chronic Days vs. Total Days (bubble chart, 1:1 line)
+
+**Question**: What is the joint structure of `days_absent_chronic` and `days_absent_total` among those with both values positive?
+
+```{r}
+#| label: gB6-data-prep
+#| code-summary: Count each (total, chronic) day combination (both > 0)
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+```{r}
+#| label: gB6
+#| code-summary: Bubble chart — chronic vs total days, 1:1 reference line
+#| echo: true
+#| cache: true
+#| fig-width: 7
+#| fig-height: 7
+#| fig-cap: "Each bubble represents a unique (total, chronic) day combination; size ∝ number of respondents. Points on the dashed 1:1 line indicate all absence is chronic; points below show additional non-chronic days."
+```
+
 # Session Info
 
 ```{r}
