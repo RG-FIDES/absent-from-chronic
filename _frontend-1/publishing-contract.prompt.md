@@ -102,6 +102,11 @@ it.
 - **Protocol**: Direct Line (REDIRECTED)
 - **Source**: `./analysis/eda-2/eda-2.html`
 
+#### EDA-4
+
+- **Protocol**: Direct Line (REDIRECTED)
+- **Source**: `./analysis/eda-4/eda-4.html`
+
 ---
 
 ### Docs

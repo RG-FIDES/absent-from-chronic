@@ -395,7 +395,7 @@ if (n_valid_al == 0) {
 n_valid_bmi <- attr(t_facil_freq[["bmi_category"]], "n_valid")
 if (n_valid_bmi == 0) {
   cat("**All-NA variable.** `bmi_category` is all-missing. ",
-      "Whitelist alias fix (`hwtdgbmi` → `hwtgbmi`) required in `manipulation/2-ellis.R`.")
+      "Whitelist alias fix (`hwtdgbmi` → `hwtgisw`) required in `manipulation/2-ellis.R`.")
 } else {
   knitr::kable(
     t_facil_freq[["bmi_category"]],
@@ -434,7 +434,7 @@ knitr::kable(
 ```
 :::
 
-> **Missing facilitating variable:** `fvcdtot` (total daily fruit & vegetable consumption) requires a whitelist fix (`fvcdgtot` → `fvcdtot`) and is absent from the current output.
+> **Note:** `fvcdgtot` (total daily fruit & vegetable consumption) is **present** in the dataset — the alias `fvcdgtot ← fvcgtot` resolves correctly in Ellis. It is a 3-category derived variable (1 = <5/day, 2 = 5–10/day, 3 = >10/day), not a continuous count; treat as ordinal in analysis.
 
 ------------------------------------------------------------------------
 
