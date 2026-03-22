@@ -175,3 +175,7 @@ analysis/eda-2/figure-png-iso/g-cycle-split-1.png
 analysis/eda-2/figure-png-iso/g-exclusion-funnel-1.png
 analysis/eda-2/figure-png-iso/g-ferry-size-1.png
 analysis/eda-2/figure-png-iso/g-whitelist-ratio-1.png
+
+/analysis/binder-*/*
+!analysis/binder-*/*.[R|qmd|ipynb]
+/_frontend-*/*
