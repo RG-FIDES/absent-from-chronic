@@ -1,0 +1,63 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - edited_content/index.qmd
+    - edited_content/project/mission.qmd
+    - edited_content/project/method.qmd
+    - edited_content/project/glossary.qmd
+    - edited_content/project/summary.qmd
+    - edited_content/pipeline/pipeline-guide.qmd
+    - edited_content/pipeline/cache-manifest.qmd
+    - edited_content/analysis/eda.qmd
+    - edited_content/analysis/report.qmd
+    - edited_content/docs/readme.qmd
+    - edited_content/docs/site-map.qmd
+    - edited_content/docs/publisher-notes.qmd
+  post-render:
+    - scripts/copy-analysis-assets.R
+
+website:
+  title: "Frontend 22 — EDA-3 Developer Briefing Site"
+  navbar:
+    left:
+      - text: "Project"
+        menu:
+          - text: "Mission"
+            href: edited_content/project/mission.qmd
+          - text: "Method"
+            href: edited_content/project/method.qmd
+          - text: "Glossary"
+            href: edited_content/project/glossary.qmd
+          - text: "Summary"
+            href: edited_content/project/summary.qmd
+      - text: "Pipeline"
+        menu:
+          - text: "Pipeline Guide"
+            href: edited_content/pipeline/pipeline-guide.qmd
+          - text: "Cache Manifest"
+            href: edited_content/pipeline/cache-manifest.qmd
+      - text: "Analysis"
+        menu:
+          - text: "EDA"
+            href: edited_content/analysis/eda.qmd
+          - text: "Report"
+            href: edited_content/analysis/report.qmd
+      - text: "Docs"
+        menu:
+          - text: "README"
+            href: edited_content/docs/readme.qmd
+          - text: "Site Map"
+            href: edited_content/docs/site-map.qmd
+          - text: "Publisher Notes"
+            href: edited_content/docs/publisher-notes.qmd
+  page-footer:
+    center: "Absent from Chronic — Frontend 22"
+  repo-url: "https://github.com/RG-FIDES/absent-from-chronic"
+
+format:
+  html:
+    theme: yeti
+    toc: true
+    mermaid:
+      theme: neutral

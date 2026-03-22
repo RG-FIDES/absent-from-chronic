@@ -3,6 +3,10 @@
 Human decisions and reasoning.
 
 ---
+
+## 202-03-22
+Creating a new report `eda-3.qmd` where we will observe the questions 4-1 and 4-2 from the `statistics_insturcitons_v3.md` file. We will also create a new folder `eda-3` where we will save the code for the questions 4-1 and 4-2.
+
 # 2026-03-11
 Review the flowr.r,1-ferry and 2-ellis scripts. Udpated README.md, pipeline.md. Created some tasks to do the pipeline manageing easier. 
 # 2026-03-05

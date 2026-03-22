@@ -1,0 +1,39 @@
+---
+title: "Site Map"
+---
+
+## Content Types
+
+| Type | Meaning |
+|------|----------|
+| **VERBATIM** | Source `.md` morphed to `.qmd` with YAML frontmatter added; content preserved exactly |
+| **COMPOSED** | Authored by the Publishing Writer; synthesized from one or more raw sources per the contract brief |
+| **GENERATED** | Produced by a pre-render script from a verbatim source, with transforms applied (e.g., mermaid diagram injection) |
+| **REDIRECT** | Transit `.qmd` stub that forwards the browser to a standalone rendered HTML file |
+
+## Navigation Structure
+
+```text
+Frontend 22 — EDA-3 Developer Briefing Site
+│
+├── 🏠  Index                      COMPOSED  ← initial.prompt + README + mission + eda-3.qmd + pipeline.md
+│
+├── Project
+│   ├── Mission                    VERBATIM  ← ai/project/mission.md
+│   ├── Method                     VERBATIM  ← ai/project/method.md
+│   ├── Glossary                   VERBATIM  ← ai/project/glossary.md
+│   └── Summary                    COMPOSED  ← mission + method + README + report-contract
+│
+├── Pipeline
+│   ├── Pipeline Guide             GENERATED ← manipulation/pipeline.md (bridge + mermaid include)
+│   └── Cache Manifest             VERBATIM  ← data-public/metadata/CACHE-manifest.md
+│
+├── Analysis
+│   ├── EDA                        REDIRECT  → edited_content/analysis/eda-3.html
+│   └── Report                     COMPOSED  ← eda-3.qmd + report-contract + figure inputs
+│
+└── Docs
+    ├── README                     GENERATED ← README.md (link/context adaptation)
+    ├── Site Map                   COMPOSED  ← _frontend-22/publishing-contract.prompt.md
+    └── Publisher Notes            VERBATIM  ← .github/publishing-orchestra-3.md
+```

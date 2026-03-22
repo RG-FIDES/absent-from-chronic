@@ -1,7 +1,7 @@
 ---
 name: "Publishing Interviewer"
 description: "Planning and conversation agent for the publishing orchestra. Reads human intent, scans the repo for publishable content, designs the edited site structure with protocol assignments, and produces publishing-contract.prompt.md. Invoke with @publishing-interviewer."
-tools: [read, search, edit, todo, vscode]
+tools: [vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo]
 ---
 
 # Publishing Interviewer

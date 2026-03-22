@@ -56,3 +56,21 @@ powershell -ExecutionPolicy Bypass -File scripts/ps1/run-eda-2.ps1
 
 > **Note**: The EDA scripts depend on the manipulation pipeline having been run first.
 > Run `source("flow.R")` or `source("manipulation/2-ellis.R")` before running any EDA.
+
+## `eda-3/` — Questions 4-1 and 4-2 Scaffold
+
+**Purpose**: Initial scaffold for the EDA responding to questions 4-1 and 4-2 from `stats_instructions_v3.md`.
+
+**Input**: Planned use of Ellis outputs in `data-private/derived/cchs-2-tables/`.
+
+**Output**: Placeholder analysis script and Quarto report in `analysis/eda-3/` with prepared folder structure (`data-local/`, `prints/`, `figure-png-iso/`).
+
+**How to run**:
+```r
+source("analysis/eda-3/eda-3.R")        # run analysis scaffold
+```
+```powershell
+quarto render analysis/eda-3/eda-3.qmd   # render report scaffold
+# or use the dedicated script:
+powershell -ExecutionPolicy Bypass -File scripts/ps1/run-eda-3.ps1
+```
