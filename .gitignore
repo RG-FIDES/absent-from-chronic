@@ -178,3 +178,7 @@ analysis/eda-2/figure-png-iso/g-whitelist-ratio-1.png
 
 _frontend*/*
 !_frontend*/publishing-contract.prompt.md
+
+analysis/binder-*/*
+!analysis/binder*/*.[qmd|md|R]
+_frontend-b2/publishing-contract.prompt.md
