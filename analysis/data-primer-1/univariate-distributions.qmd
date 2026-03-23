@@ -434,7 +434,7 @@ knitr::kable(
 ```
 :::
 
-> **Note:** `fvcdgtot` (total daily fruit & vegetable consumption) is **present** in the dataset — the alias `fvcdgtot ← fvcgtot` resolves correctly in Ellis. It is a 3-category derived variable (1 = <5/day, 2 = 5–10/day, 3 = >10/day), not a continuous count; treat as ordinal in analysis.
+> **Note:** `fvcdgtot` (total daily fruit & vegetable consumption) is **present** in the dataset — the alias `fvcdgtot ← fvcgtot` resolves correctly in Ellis. It is a 3-category derived variable (1 = \<5/day, 2 = 5–10/day, 3 = \>10/day), not a continuous count; treat as ordinal in analysis.
 
 ------------------------------------------------------------------------
 

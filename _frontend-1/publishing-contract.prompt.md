@@ -27,30 +27,29 @@ it.
   find evidence of each addressed requirement. Establish that the pipeline is built, the data is
   clean, and the study variables are documented and profiled.
 - **Goal**: Home page — the first thing a visitor sees.
-- **Spirit**: Professional and direct. Lead with the study title and purpose. Three-sentence summary
-  of the analytical layers (pipeline → data primer → EDA). No marketing language. End with a brief
-  "How to use this site" paragraph pointing to the main sections.
-- **Inputs**: `ai/project/mission.md`, `README.md`, `data-public/metadata/CACHE-manifest.md`
+- **Spirit**: Professional and direct. Lead with the study title and purpose, anchored by the LOP
+  days distribution chart (`g01` from EDA-4). Three-sentence summary of the analytical layers
+  (pipeline → data primer → EDA). No marketing language. End with a brief "How to use this site"
+  paragraph pointing to the main sections.
+- **Image**: `images/g01_lop_days_histogram.png` — copied from
+  `analysis/eda-4/prints/g01_lop_days_histogram.png` by the pre-render hook.
+- **Inputs**: `README.md`, `data-public/metadata/CACHE-manifest.md`
   (use the dataset summary: 63,843 rows, 62 columns, two CCHS cycles pooled).
 
 ---
 
 ### Project
 
-#### Mission
+#### Statistical Instructions
 
-- **Protocol**: Direct Line (VERBATIM)
-- **Source**: `./ai/project/mission.md`
-
-#### Method
-
-- **Protocol**: Direct Line (VERBATIM)
-- **Source**: `./ai/project/method.md`
-
-#### Glossary
-
-- **Protocol**: Direct Line (VERBATIM)
-- **Source**: `./ai/project/glossary.md`
+- **Protocol**: Technical Bridge
+- **Source**: `./data-private/raw/2026-02-19/stats_instructions_v3.md`
+- **Transforms**:
+  - Present the document as-is. Strip any preamble referencing internal AI agent instructions or
+    repository workflow notes that are not part of the scientific content.
+  - Retain all numbered sections (§1–§6), all tables, all R code blocks (these are methodology
+    context relevant to the PI).
+  - Do not reference `data-private/` paths in the rendered page.
 
 ---
 
@@ -85,8 +84,12 @@ it.
 
 #### Variable Inclusion
 
-- **Protocol**: Direct Line (REDIRECTED)
-- **Source**: `./analysis/data-primer-1/variable-inclusion.html`
+- **Protocol**: Direct Line (VERBATIM)
+- **Source**: `./analysis/data-primer-1/variable-inclusion.qmd`
+- **Note**: QMD is transferred to `edited_content/data-primer/variable-inclusion.qmd` and
+  rendered as part of the Quarto site build. The standalone HTML (`variable-inclusion.html`)
+  is for local development preview only. Strip `embed-resources: true` and `theme: flatly`
+  from YAML (inherited from site `_quarto.yml`).
 
 #### Univariate Distributions
 
@@ -106,6 +109,26 @@ it.
 
 - **Protocol**: Direct Line (REDIRECTED)
 - **Source**: `./analysis/eda-4/eda-4.html`
+
+#### Binder-2: Table Anatomy
+
+- **Protocol**: Direct Line (REDIRECTED)
+- **Source**: `./analysis/binder-2/1-table-anatomy.html`
+
+#### Binder-2: Sociodemographic Fabric
+
+- **Protocol**: Direct Line (REDIRECTED)
+- **Source**: `./analysis/binder-2/2-sociodemographic-fabric.html`
+
+#### Binder-2: Outcome Anatomy
+
+- **Protocol**: Direct Line (REDIRECTED)
+- **Source**: `./analysis/binder-2/3-outcome-anatomy.html`
+
+#### Binder-2: Raw to Analytical
+
+- **Protocol**: Direct Line (REDIRECTED)
+- **Source**: `./analysis/binder-2/4-raw-to-analytical.html`
 
 ---
 
