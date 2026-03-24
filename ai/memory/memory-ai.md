@@ -4,6 +4,33 @@ AI system status and technical briefings.
 
 ---
 
+## 2026-03-24 
+
+Implemented and validated EDA-4 fixes requested in `analysis/eda-4/fixes2.prompt.md`:
+
+- Added explicit end-of-section §5.1 MCAR result table and decision notes in `eda-4.qmd`
+- Expanded §5.2 output tables to include comprehensive pooled + cycle-stratified summaries
+- Added static `ggplot2` PNG exports for each EDA-4 graph family into `analysis/eda-4/prints/`
+- Extended outcome descriptive helpers to include unweighted `n`, mean, SD alongside weighted stats
+- Fixed cache-related render issue by setting `t2-data-prep` chunk to `cache: false`
+
+Added VS Code task in `.vscode/tasks.json`:
+
+- `Run EDA-4 Pipeline` with command:
+  `Rscript analysis/eda-4/eda-4.R ; quarto render analysis/eda-4/eda-4.qmd`
+
+Validation outcome:
+
+- EDA-4 render succeeded (`quarto render analysis/eda-4/eda-4.qmd`)
+- No code diagnostics in edited EDA-4 files
+
+Requirement audit snapshot (from `stats_instructions_v3.md`):
+
+- §5.1: covered (MCAR test, variable missingness proportions, handling decision logic, visuals)
+- §5.2: covered for required outputs (unweighted/weighted categorical frequencies/proportions and weighted outcome mean/SD by cycle), with caveat that design currently uses `svydesign(ids = ~1, weights = ~wts_m_pooled)` and does not incorporate bootstrap replicate variance in this EDA
+
+---
+
 ## 2026-03-22 (frontend-22 publishing writer execution)
 
 Executed `_frontend-22/publishing-contract.prompt.md` end-to-end in Writer mode.

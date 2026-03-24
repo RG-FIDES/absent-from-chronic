@@ -3,8 +3,9 @@
 Human decisions and reasoning.
 
 ---
-
-## 202-03-22
+## 2026-03-24
+Creating a new report `eda-4.qmd` where we will observe the questinos 5.1 and 5.2 from the `statistics_instrucitons_v3.md` file. 
+## 2026-03-22
 Creating a new report `eda-3.qmd` where we will observe the questions 4-1 and 4-2 from the `statistics_insturcitons_v3.md` file. We will also create a new folder `eda-3` where we will save the code for the questions 4-1 and 4-2.
 
 # 2026-03-11

@@ -1,9 +1,0 @@
-```{mermaid}
-flowchart TD
-    A[CCHS .sav inputs] --> B[Lane 1: Ferry]
-    B --> C[Staging SQLite + Parquet]
-    C --> D[Lane 2: Ellis]
-    D --> E[Analysis-ready parquet and sqlite]
-    E --> F[Validation checks]
-    F --> G[EDA-3 outputs]
-```

@@ -1,5 +1,0 @@
----
-title: "Publisher Notes"
----
-
-{{< include ../../../.github/publishing-orchestra-3.md >}}
