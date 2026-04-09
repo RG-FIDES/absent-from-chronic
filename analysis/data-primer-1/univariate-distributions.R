@@ -45,9 +45,9 @@ summarize_continuous <- function(ds, vars) {
       mean      = if (length(x_valid) > 0) round(mean(x_valid), 2) else NA_real_,
       sd        = if (length(x_valid) > 0) round(sd(x_valid), 2) else NA_real_,
       min       = if (length(x_valid) > 0) round(min(x_valid), 2) else NA_real_,
-      p25       = if (length(x_valid) > 0) round(quantile(x_valid, 0.25), 2) else NA_real_,
+      p25       = if (length(x_valid) > 0) round(unname(quantile(x_valid, 0.25)), 2) else NA_real_,
       median    = if (length(x_valid) > 0) round(median(x_valid), 2) else NA_real_,
-      p75       = if (length(x_valid) > 0) round(quantile(x_valid, 0.75), 2) else NA_real_,
+      p75       = if (length(x_valid) > 0) round(unname(quantile(x_valid, 0.75)), 2) else NA_real_,
       max       = if (length(x_valid) > 0) round(max(x_valid), 2) else NA_real_,
       stringsAsFactors = FALSE
     )

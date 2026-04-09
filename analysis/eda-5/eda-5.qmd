@@ -1,6 +1,6 @@
 ---
 title: "EDA 4 — Section 4.1 (Alternative Take): LOP Component Decomposition"
-subtitle: "eda-4 — Dissecting the Primary Outcome Variable into Its 8 Reason Categories"
+subtitle: "eda-5 — Dissecting the Primary Outcome Variable into Its 8 Reason Categories"
 author: "Analysis Team"
 date: "2026-03-22"
 format:
@@ -30,7 +30,7 @@ This report provides an **alternative take on Section 4.1** (Outcome Variable Co
 2.  How much does each LOP component contribute to the weighted mean of `days_absent_total` in absolute and relative terms?
 3.  How many reason categories does a typical respondent report simultaneously, and what is the co-occurrence pattern across reason pairs?
 
-Following the dual-file development pattern, all analytical code lives in `analysis/eda-4/eda-4.R`. This document sources those chunks for presentation.
+Following the dual-file development pattern, all analytical code lives in `analysis/eda-5/eda-5.R`. This document sources those chunks for presentation.
 
 # Definition of Terms
 
@@ -83,7 +83,7 @@ opts_chunk$set(
 )
 options(width = 100)
 ggplot2::theme_set(ggplot2::theme_minimal())
-read_chunk("analysis/eda-4/eda-4.R")
+read_chunk("analysis/eda-5/eda-5.R")
 ```
 
 # Environment

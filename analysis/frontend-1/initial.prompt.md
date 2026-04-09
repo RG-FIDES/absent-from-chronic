@@ -31,7 +31,7 @@ understand them from scratch.
 
 ## Content to Include
 
-The index should host g01 from eda-4.
+The index should host g01 from eda-5.
 
 ### Project documentation
 
@@ -58,7 +58,7 @@ The index should host g01 from eda-4.
 
 - EDA-2 from `analysis/eda-2/eda-2.html` — a pipeline observation report (ferry + ellis
   diagnostics, row counts, output verification)
-- EDA-4 from `analysis/eda-4/eda-4.html` — outcome variable decomposition: LOP reason-category
+- EDA-5 from `analysis/eda-5/eda-5.html` — outcome variable decomposition: LOP reason-category
   prevalence, relative contribution, and co-occurrence
 
 ### Binder-2

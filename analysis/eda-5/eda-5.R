@@ -1,6 +1,6 @@
 # nolint start
 # AI agents must consult ./analysis/eda-1/eda-style-guide.md before making changes to this file.
-# EDA-4: Alternative take on Section 4.1 — LOP component decomposition
+# EDA-5: Alternative take on Section 4.1 — LOP component decomposition
 # Mode: EDA (explore with open mind)
 rm(list = ls(all.names = TRUE)) # Clear the memory of variables from previous run.
 cat("\014") # Clear the console
@@ -58,10 +58,10 @@ if (file.exists("./scripts/graphing/graph-presets.R")) {
 }
 
 # ---- declare-globals ---------------------------------------------------------
-local_root    <- "./analysis/eda-4/"
+local_root    <- "./analysis/eda-5/"
 local_data    <- paste0(local_root, "data-local/")
 prints_folder <- paste0(local_root, "prints/")
-data_private_derived <- "./data-private/derived/eda-4/"
+data_private_derived <- "./data-private/derived/eda-5/"
 
 if (!fs::dir_exists(local_data))           fs::dir_create(local_data)
 if (!fs::dir_exists(prints_folder))        fs::dir_create(prints_folder)

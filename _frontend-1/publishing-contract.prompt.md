@@ -28,11 +28,11 @@ it.
   clean, and the study variables are documented and profiled.
 - **Goal**: Home page — the first thing a visitor sees.
 - **Spirit**: Professional and direct. Lead with the study title and purpose, anchored by the LOP
-  days distribution chart (`g01` from EDA-4). Three-sentence summary of the analytical layers
+  days distribution chart (`g01` from EDA-5). Three-sentence summary of the analytical layers
   (pipeline → data primer → EDA). No marketing language. End with a brief "How to use this site"
   paragraph pointing to the main sections.
 - **Image**: `images/g01_lop_days_histogram.png` — copied from
-  `analysis/eda-4/prints/g01_lop_days_histogram.png` by the pre-render hook.
+  `analysis/eda-5/prints/g01_lop_days_histogram.png` by the pre-render hook.
 - **Inputs**: `README.md`, `data-public/metadata/CACHE-manifest.md`
   (use the dataset summary: 63,843 rows, 62 columns, two CCHS cycles pooled).
 
@@ -105,10 +105,10 @@ it.
 - **Protocol**: Direct Line (REDIRECTED)
 - **Source**: `./analysis/eda-2/eda-2.html`
 
-#### EDA-4
+#### EDA-5
 
 - **Protocol**: Direct Line (REDIRECTED)
-- **Source**: `./analysis/eda-4/eda-4.html`
+- **Source**: `./analysis/eda-5/eda-5.html`
 
 #### Binder-2: Table Anatomy
 
