@@ -1,0 +1,17 @@
+---
+title: "Summary"
+---
+
+The Absent from Chronic project analyzes work absenteeism using pooled CCHS 2010-2011 and 2013-2014 public-use microdata (`README.md`). Its stated mission is to deliver an analysis frontend that addresses the statistical instruction set in `data-private/raw/2026-02-19/stats_instructions_v3.md` (`ai/project/mission.md`).
+
+The methodological spine is a staged Ferry-to-Ellis pipeline (`ai/project/method.md`, `manipulation/pipeline.md`). Ferry performs transport-only ingestion from SPSS into staging artifacts. Ellis creates analysis-ready tables, including a main analytical dataset and sample-flow diagnostics. This separation keeps semantics and transformation logic explicit and reproducible.
+
+Frontend 22 is developer-facing and focuses on EDA-3 as the newest deliverable (`analysis/frontend-22/initial.prompt.md`). EDA-3 directly addresses instruction questions 4-1 and 4-2 (`analysis/eda-3/report-contract.prompt.md`, `analysis/eda-3/eda-3.qmd`) through:
+
+- Comparison of primary and sensitive absenteeism outcomes
+- Weighted descriptive distributional profiling
+- Code-backed proof tables and exported figures
+
+From an implementation perspective, EDA-3 contributes practical decision support for next-stage modeling: evidence on missingness and outcome-definition behavior for Q4-1, and distribution diagnostics for Q4-2 (including mean/variance structure and zero concentration) documented inside the rendered EDA report (`analysis/eda-3/eda-3.qmd`).
+
+In short, this project combines a disciplined data pipeline with explicit analytical checkpoints. Frontend 22 turns that into an actionable developer briefing: what was run, what was produced, and where downstream work can build confidently.

@@ -1,0 +1,99 @@
+---
+title: "CACHE Manifest"
+---
+
+# CACHE Manifest
+
+Definitive reference for datasets produced by the Ellis lane (`manipulation/2-ellis.R`).
+Describes file structure, variable inventory, factor levels, and transformation logic.
+Manually maintained — update after re-running Ellis with changed flags or white-list.
+
+Updated: 2026-03-20
+
+---
+
+## Overview
+
+| Dataset | Path | Format | Rows (default mode) | Columns |
+|---------|------|--------|--------------------:|---------|
+| `cchs_analytical` | `data-private/derived/cchs-2-tables/cchs_analytical.parquet` | Parquet | 63,843 | 62 |
+| `cchs_analytical` | `data-private/derived/cchs-2.sqlite` | SQLite | 63,843 | 62 |
+| `sample_flow` | `data-private/derived/cchs-2-tables/sample_flow.parquet` | Parquet | 5 | 5 |
+| `sample_flow` | `data-private/derived/cchs-2.sqlite` | SQLite | 5 | 5 |
+
+**Run mode:** `apply_sample_exclusions = TRUE` (§3.1 exclusion criteria applied).
+Full pooled mode (`apply_sample_exclusions = FALSE`) yields ~126,431 rows.
+
+**Source cycles pooled:**
+
+| Cycle | CCHS label | Raw rows | After exclusions |
+|-------|-----------|----------|-----------------|
+| `cycle = 0` | CCHS 2010–2011 | ~62,909 | 32,621 |
+| `cycle = 1` | CCHS 2013–2014 | ~63,522 | 31,222 |
+
+**Survey weight pooling (Statistics Canada guideline):**
+
+```
+wts_m_pooled   = wts_m / 2      # for each respondent
+bsw001_pooled  = bsw001 / 2     # same rule applied to all 500 bootstrap weights
+```
+
+`wts_m_original` is retained alongside `wts_m_pooled` for verification.
+
+---
+
+## Reference Diagnostics (`cchs_analytical`, default mode)
+
+Verified from actual run on 2026-03-20. Ten INFERRED white-list variables were absent from both
+CCHS PUMF cycles (`ccc_300`, `ccc_185`, `dhhdglvg`, `dhhdfc5`, `dhhdfc11`, `dhhdfc12p`, `sdcdgstud`,
+`alcdgtyp`, `hwtdgbmi`, `noc_31`); five of these are added as NA columns for factor recode
+compatibility; two CCC conditions and three household child-count variables are entirely absent.
+Bootstrap weights (`bsw*`) were also absent. Diagnostics reflect the current data files.
+
+| Diagnostic | Actual value |
+|------------|-------------|
+| Unweighted sample size | 63,843 |
+| Weighted mean `days_absent_total` | ≈ 1.25 |
+| Weighted variance `days_absent_total` | ≈ 15.4 |
+| Dispersion (variance / mean) | > 1 → overdispersion → negative binomial recommended |
+| % zeros in `days_absent_total` (unweighted) | ≈ 70.5% |
+| Maximum `days_absent_total` | 63 (observed); 90 = enforced cap |
+| Out-of-range values set to NA | 2,448 respondents |
+
+---
+
+## cchs_analytical — Variable Inventory
+
+See source `data-public/metadata/CACHE-manifest.md` for the full variable-level reference, recoding logic, and complete limitation notes.
+
+### Outcome Variables
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `days_absent_total` | numeric | Primary outcome: row-wise sum of 8 LOP components (NA-safe; all-NA rows → 0) |
+| `days_absent_chronic` | numeric | Sensitivity outcome: `lopg040` only (days absent due to own chronic condition) |
+| `outcome_all_na` | logical | `TRUE` if all 8 LOP variables were `NA` before summing |
+
+---
+
+## sample_flow — Exclusion Audit Table
+
+Records the step-by-step effect of §3.1 inclusion/exclusion criteria.
+Always 5 rows (6 if `apply_completeness_exclusion = TRUE`).
+
+| Step | Description | n_remaining | n_excluded | pct_remaining |
+|------|-------------|------------:|-----------:|--------------:|
+| `1_start` | Starting pool (both CCHS cycles pooled) | 126,431 | 0 | 100.0% |
+| `2_after_age_15_75` | Exclude respondents outside age 15–75 | 112,352 | 14,079 | 88.9% |
+| `3_after_employed` | Exclude respondents not employed (past 3 months) | 64,248 | 48,104 | 50.8% |
+| `4_after_no_proxy` | Exclude proxy respondents | 64,248 | 0 | 50.8% |
+| `5_after_complete_outcome` | Exclude respondents with missing outcome | 63,843 | 405 | 50.5% |
+
+---
+
+## Notes and Limitations
+
+- 10 INFERRED variables were absent from both CCHS PUMF cycles in the current run.
+- Bootstrap replicate weights were absent from the available PUMF files.
+- Some cross-cycle naming and labeling differences are harmonized in Ellis.
+- For full details, use the authoritative source file linked above.

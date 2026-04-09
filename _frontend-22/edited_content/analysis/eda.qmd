@@ -1,0 +1,11 @@
+---
+title: "EDA"
+format:
+  html:
+    page-layout: full
+    toc: false
+---
+
+<meta http-equiv="refresh" content="0; url=eda-3.html">
+
+If redirection does not occur automatically, open [EDA-3](eda-3.html).
