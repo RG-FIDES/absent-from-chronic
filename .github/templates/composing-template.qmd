@@ -21,6 +21,7 @@ editor_options:
 ---
 
 <!-- Composing Orchestra template — customize all {PLACEHOLDERS} before use. -->
+
 <!-- Mode: {TYPE} (EDA = explore with open mind | Report = synthesize prior findings) -->
 
 # Mission
@@ -29,9 +30,9 @@ editor_options:
 
 **Research Questions:**
 
-1. {RQ1}
-2. {RQ2}
-3. {RQ3}
+1.  {RQ1}
+2.  {RQ2}
+3.  {RQ3}
 
 Following the dual-file development pattern, analytical code lives in the companion `.R` script. This document sources those chunks for presentation.
 

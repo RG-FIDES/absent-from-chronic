@@ -4,6 +4,67 @@ AI system status and technical briefings.
 
 ---
 
+## 2026-03-24 
+
+Implemented and validated EDA-4 fixes requested in `analysis/eda-4/fixes2.prompt.md`:
+
+- Added explicit end-of-section §5.1 MCAR result table and decision notes in `eda-4.qmd`
+- Expanded §5.2 output tables to include comprehensive pooled + cycle-stratified summaries
+- Added static `ggplot2` PNG exports for each EDA-4 graph family into `analysis/eda-4/prints/`
+- Extended outcome descriptive helpers to include unweighted `n`, mean, SD alongside weighted stats
+- Fixed cache-related render issue by setting `t2-data-prep` chunk to `cache: false`
+
+Added VS Code task in `.vscode/tasks.json`:
+
+- `Run EDA-4 Pipeline` with command:
+  `Rscript analysis/eda-4/eda-4.R ; quarto render analysis/eda-4/eda-4.qmd`
+
+Validation outcome:
+
+- EDA-4 render succeeded (`quarto render analysis/eda-4/eda-4.qmd`)
+- No code diagnostics in edited EDA-4 files
+
+Requirement audit snapshot (from `stats_instructions_v3.md`):
+
+- §5.1: covered (MCAR test, variable missingness proportions, handling decision logic, visuals)
+- §5.2: covered for required outputs (unweighted/weighted categorical frequencies/proportions and weighted outcome mean/SD by cycle), with caveat that design currently uses `svydesign(ids = ~1, weights = ~wts_m_pooled)` and does not incorporate bootstrap replicate variance in this EDA
+
+---
+
+## 2026-03-22 (frontend-22 publishing writer execution)
+
+Executed `_frontend-22/publishing-contract.prompt.md` end-to-end in Writer mode.
+Built new frontend workspace artifacts from scratch:
+
+- `edited_content/` pages for Project, Pipeline, Analysis, Docs, and `index.qmd`
+- shared mermaid partial: `_frontend-22/edited_content/_mermaid-index.qmd`
+- Quarto config: `_frontend-22/_quarto.yml` (explicit render list, navbar, theme, footer, repo URL)
+- post-render hook: `_frontend-22/scripts/copy-analysis-assets.R`
+
+Implemented Direct Line (VERBATIM), Technical Bridge, Narrative Bridge, and REDIRECT coverage
+for contract pages, including REDIRECT for analysis EDA page.
+
+Render run:
+
+- `quarto render` in `_frontend-22/` completed successfully after one include-path fix in
+  `edited_content/docs/publisher-notes.qmd` (`../../` → `../../../`)
+
+Post-render hook behavior verified:
+
+- copied `analysis/eda-3/eda-3.html` to `_frontend-22/_site/edited_content/analysis/eda-3.html`
+- copied EDA-3 figure assets to `_frontend-22/_site/analysis/eda-3/figure-png-iso/`
+
+Reconciliation checks:
+
+- expected page structure exists under `_frontend-22/_site/edited_content/`
+- rendered HTML count under `_site/edited_content`: 13
+- no diagnostics errors in `_frontend-22`
+
+Session outcome: Frontend 22 site is build-complete and browseable from
+`_frontend-22/_site/index.html`.
+
+---
+
 ## 2026-03-21 (documentation alignment sprint)
 
 Ran Ellis (`apply_sample_exclusions = TRUE`) producing 63,843 rows × 62 columns (Cycle 0:

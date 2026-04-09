@@ -1,0 +1,478 @@
+---
+title: "EDA 3 - Questions 4-1 and 4-2"
+subtitle: "Outcome Comparison and Weighted Descriptive Statistics"
+author: "Analysis Team"
+date: "2026-03-22"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    code-fold: show
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: true
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options:
+  chunk_output_type: console
+---
+
+# Mission
+
+This document **observes and documents** question **4-1** and question **4-2** from `stats_instructions_v3.md`, using the existing Ellis output in `data-private/derived/cchs-2-tables/`. It keeps the same reporting style used in `eda-2.qmd`: requirement framing, explicit code-based proof chunks, and concise completion callouts.
+
+**Data genealogy for this report:**
+
+```         
+1-ferry.R  ──► cchs-1.sqlite ──► 2-ellis.R ──► cchs_analytical.parquet ──► EDA-3 (Q4-1, Q4-2)
+```
+
+This report is split into two parts:
+
+-   **Part A — Q4-1 Outcome Comparison**: primary vs sensitive absenteeism outcomes
+-   **Part B — Q4-2 Weighted Distributional Profile**: required weighted descriptive statistics and distribution checks
+
+```{r}
+#| label: knitr-root
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = '../../')
+```
+
+```{r}
+#| label: set_options
+#| code-summary: Report-wide formatting options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+opts_chunk$set(
+  results = 'show',
+  message = FALSE,
+  warning = FALSE,
+  comment = NA,
+  tidy = FALSE,
+  out.width = "960px",
+  fig.width = 10,
+  fig.height = 6,
+  fig.path = 'figure-png-iso/'
+)
+options(width = 100)
+ggplot2::theme_set(ggplot2::theme_minimal())
+read_chunk("analysis/eda-3/eda-3.R")
+```
+
+# Environment
+
+```{r}
+#| label: load-packages
+#| code-summary: Packages used in this report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: load-sources
+#| code-summary: Project-level functions
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-globals
+#| code-summary: Paths and constants
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-functions
+#| code-summary: Local helper functions
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+------------------------------------------------------------------------
+
+# Part A — Question 4-1 Outcome Comparison {#part-a}
+
+## A.1 Inputs
+
+```{r}
+#| label: load-data
+#| code-summary: Load analytical dataset from Ellis output
+#| code-fold: true
+#| cache: true
+```
+
+::: {.callout-note icon="false"}
+**Requirement — §4.1** (`stats_instructions_v3.md`, verbatim):
+
+The primary outcome is the total number of workdays missed in the three months preceding the survey due to any health-related reason. This is a count variable derived from the LOP module by summing days absent across all reported health reasons:
+
+- Chronic condition
+- Injury
+- Cold (runny nose, congestion, cough)
+- Gastroenteritis
+- Flu/influenza
+- Other respiratory infection
+- Other infectious disease
+- Any other reason related to physical or mental health
+
+The previous analysis specifies a minimum value of 1 day and a maximum of 90 days. Participants reporting zero days absent have the value 0 (not missing).
+
+The sensitivity analysis uses days absent due to chronic conditions only. This restricted outcome variable should be constructed separately.
+:::
+
+The analytical table used is `cchs_analytical.parquet` with pooled survey weight `wts_m_pooled`.
+
+## A.2 Data Context
+
+For complete data documentation, see the [Data Primer](../data-primer-1/data-primer-1.html).
+
+```{r}
+#| label: data-context-tables
+#| code-summary: Ellis tables used and rationale
+#| code-fold: true
+#| cache: true
+print(data_context_tables)
+print(data_context_grain)
+```
+
+```{r}
+#| label: data-context-person
+#| code-summary: Single-person record view
+#| code-fold: true
+#| cache: true
+print(data_context_person)
+```
+
+```{r}
+#| label: data-context-distributions
+#| code-summary: Key variable distributions
+#| code-fold: true
+#| cache: true
+print(data_context_distributions)
+```
+
+## A.3 Q4-1 Analysis
+
+Question 4-1 is implemented as a **comparative availability analysis** between the two outcome definitions, focused on the number of observed rows and weighted coverage by outcome.
+
+To make the construction pathway explicit, this section also anchors the outcome columns to Ferry/Ellis logic documented in `manipulation/pipeline.md`, `analysis/eda-2/eda-2.qmd`, and `analysis/eda-2/eda-2.R`.
+
+### A.3.1 How each outcome column is built (code provenance)
+
+From the Ellis lane (`manipulation/2-ellis.R`), the two columns are generated in `# ---- tweak-data-1-outcomes ----`:
+
+```r
+lop_vars <- c("lopg040", "lopg070", "lopg082", "lopg083",
+              "lopg084", "lopg085", "lopg086", "lopg100")
+
+days_absent_total = rowSums(across(all_of(lop_vars), ~ as.numeric(.x)), na.rm = TRUE)
+outcome_all_na = rowSums(is.na(across(all_of(lop_vars)))) == length(lop_vars)
+days_absent_total = if_else(outcome_all_na, 0, days_absent_total)
+
+days_absent_chronic = as.numeric(lopg040)
+```
+
+Interpretation for this report:
+
+- `days_absent_total` is the 8-reason sum (with all-NA rows set to structural zero).
+- `days_absent_chronic` is the chronic-only component (`lopg040`).
+- EDA-2 documents this same lineage at the pipeline level (Ferry -> Ellis -> `cchs_analytical.parquet`), and EDA-3 reads that Ellis output directly.
+
+```{r}
+#| label: g1-data-prep
+#| code-summary: Prepare and summarize Q4-1 outcomes
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: g1-data-prep-display
+#| code-summary: Display Q4-1 row-count comparison table
+#| code-fold: true
+#| cache: true
+print(q4_1_count_comparison)
+```
+
+```{r}
+#| label: g1
+#| code-summary: Row-count comparison for primary vs sensitive outcome
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-1 comparison of observed rows by outcome definition (non-missing vs missing)."
+```
+
+```{r}
+#| label: g1-display
+#| code-summary: Render Q4-1 row-count comparison figure
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-1 comparison of observed rows by outcome definition (non-missing vs missing)."
+print(g1_outcome_row_counts)
+```
+
+```{r}
+#| label: g11
+#| code-summary: Weighted coverage comparison for non-missing outcomes
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-1 weighted non-missing population retained by outcome definition."
+```
+
+```{r}
+#| label: g11-display
+#| code-summary: Render weighted non-missing coverage comparison
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-1 weighted non-missing population retained by outcome definition."
+print(g11_outcome_weighted_coverage)
+```
+
+```{r}
+#| label: verify-q41-proof
+#| code-summary: "§4.1 PROOF: weighted comparison table, row-count comparison, and mean-gap check"
+#| code-fold: true
+verify_q41_proof <- q4_1_summary %>%
+  transmute(
+    outcome,
+    n_obs_non_missing,
+    weighted_mean = round(weighted_mean, 4),
+    weighted_se_mean = round(weighted_se_mean, 4)
+  )
+
+q4_1_mean_gap_proof <- q4_1_comparison %>%
+  summarise(
+    mean_difference_primary_minus_sensitive =
+      weighted_mean[outcome == "Primary outcome: days_absent_total"] -
+      weighted_mean[outcome == "Sensitive outcome: days_absent_chronic"]
+  ) %>%
+  mutate(
+    mean_difference_primary_minus_sensitive =
+      round(mean_difference_primary_minus_sensitive, 4)
+  )
+
+q4_1_count_gap_proof <- q4_1_count_gap %>%
+  mutate(across(everything(), ~ round(.x, 4)))
+
+print(verify_q41_proof)
+print(q4_1_count_comparison)
+print(q4_1_count_gap_proof)
+print(q4_1_mean_gap_proof)
+```
+
+::: {.callout-tip icon="false"}
+**§4.1 DONE — Primary vs sensitive outcomes compared** ✓
+
+The report now focuses first on the observable row-level comparison between `days_absent_total` and `days_absent_chronic` (non-missing/missing counts + weighted non-missing coverage), with proof tables that also include the weighted mean gap check.
+:::
+
+------------------------------------------------------------------------
+
+# Part B — Question 4-2 Weighted Statistics {#part-b}
+
+## B.1 Requirement Framing
+
+::: {.callout-note icon="false"}
+**Requirement — §4.2** (`stats_instructions_v3.md`, verbatim):
+
+Before modeling, verify and report the following descriptive statistics for the outcome variable:
+
+- Mean and standard error (weighted)
+- Median, Q1, Q3 (weighted)
+- Variance and standard deviation (weighted)
+- Frequency and proportion of zero values
+- Maximum value
+- Pearson dispersion statistic (variance/mean ratio)
+:::
+
+## B.2 Weighted Statistics Table
+
+The table below is the main code-backed output for Q4-2.
+
+```{r}
+#| label: g2-data-prep
+#| code-summary: Compute weighted statistics for Q4-2 requirements
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: g2-data-prep-display
+#| code-summary: Display Q4-2 weighted statistics table (reader-friendly)
+#| code-fold: true
+#| cache: true
+q4_2_stats_pretty %>%
+  mutate(`Zero proportion (weighted)` = scales::percent(`Zero proportion (weighted)`, accuracy = 0.01)) %>%
+  knitr::kable(caption = "Q4-2 required weighted descriptive statistics by outcome")
+```
+
+## B.3 Distributional Checks
+
+```{r}
+#| label: g2
+#| code-summary: Weighted distribution comparison for both outcomes
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Weighted histograms of absenteeism outcomes."
+```
+
+```{r}
+#| label: g2-display
+#| code-summary: Render weighted distribution histogram figure
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Weighted histograms of absenteeism outcomes."
+print(g2_weighted_distribution)
+```
+
+```{r}
+#| label: g21
+#| code-summary: Zero-value profile comparison (frequency + weighted share)
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 zero-value profile by outcome: unweighted zero count and weighted zero proportion."
+```
+
+```{r}
+#| label: g21-display
+#| code-summary: Render zero-value profile comparison
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 zero-value profile by outcome: unweighted zero count and weighted zero proportion."
+print(g21_zero_frequency_and_share)
+```
+
+```{r}
+#| label: g22
+#| code-summary: Core required statistic comparison across both outcomes
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 core required metrics by outcome: weighted mean/median/quartiles, weighted SD, and maximum value."
+```
+
+```{r}
+#| label: g22-display
+#| code-summary: Render core required statistic comparison
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 core required metrics by outcome: weighted mean/median/quartiles, weighted SD, and maximum value."
+print(g22_required_core_comparison)
+```
+
+```{r}
+#| label: g23
+#| code-summary: Diagnostic required statistic comparison across both outcomes
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 diagnostic metrics by outcome: weighted variance, zero frequency, weighted zero proportion, and Pearson dispersion."
+```
+
+```{r}
+#| label: g23-display
+#| code-summary: Render diagnostic required statistic comparison
+#| code-fold: true
+#| cache: true
+#| fig-cap: "Q4-2 diagnostic metrics by outcome: weighted variance, zero frequency, weighted zero proportion, and Pearson dispersion."
+print(g23_required_diagnostic_comparison)
+```
+
+```{r}
+#| label: verify-q42-proof
+#| code-summary: "§4.2 PROOF: required metrics checklist and extracted verification table"
+#| code-fold: true
+q4_2_metrics_proof <- tibble::tibble(
+  metric_required = c(
+    "Mean (weighted)",
+    "Standard error of mean (weighted)",
+    "Median (weighted)",
+    "Q1 (weighted)",
+    "Q3 (weighted)",
+    "Variance (weighted)",
+    "Standard deviation (weighted)",
+    "Frequency of zero values",
+    "Proportion of zero values",
+    "Maximum value",
+    "Pearson dispersion (variance / mean)"
+  ),
+  computed_in_table = c(
+    "weighted_mean" %in% names(q4_2_stats),
+    "weighted_se_mean" %in% names(q4_2_stats),
+    "weighted_median" %in% names(q4_2_stats),
+    "weighted_q1" %in% names(q4_2_stats),
+    "weighted_q3" %in% names(q4_2_stats),
+    "weighted_variance" %in% names(q4_2_stats),
+    "weighted_sd" %in% names(q4_2_stats),
+    "zero_frequency_unweighted" %in% names(q4_2_stats),
+    "zero_proportion_weighted" %in% names(q4_2_stats),
+    "maximum_value" %in% names(q4_2_stats),
+    "pearson_dispersion" %in% names(q4_2_stats)
+  )
+) %>%
+  mutate(status = if_else(computed_in_table, "PASS ✓", "FAIL ⚠"))
+
+verify_q42_proof <- q4_2_stats %>%
+  select(
+    outcome,
+    weighted_mean,
+    weighted_se_mean,
+    weighted_q1,
+    weighted_median,
+    weighted_q3,
+    weighted_variance,
+    weighted_sd,
+    zero_frequency_unweighted,
+    zero_proportion_weighted,
+    maximum_value,
+    pearson_dispersion
+  )
+
+print(q4_2_metrics_proof)
+print(verify_q42_proof)
+```
+
+::: {.callout-tip icon="false"}
+**§4.2 DONE — Weighted descriptive profile completed** ✓
+
+All requested weighted statistics were computed and displayed for both outcomes, with accompanying distribution and zero-value proportion visual checks.
+:::
+
+## B.4 Output Artifacts
+
+| Output | Location | Content |
+|------------------------|------------------------|------------------------|
+| `q4_1_summary.parquet` | `data-private/derived/eda-3/` | Weighted comparison summary for Q4-1 |
+| `q4_2_stats.parquet` | `data-private/derived/eda-3/` | Weighted descriptive statistics table for Q4-2 |
+| Plot exports | `analysis/eda-3/prints/` | `g1`, `g11`, `g2`, `g21`, `g22`, `g23` high-resolution figures |
+
+------------------------------------------------------------------------
+
+# Session Info
+
+```{r}
+#| label: session-info
+#| code-summary: Runtime and R session metadata
+#| echo: false
+#| code-fold: true
+cat("Report completed at:", as.character(Sys.time()), "\n")
+cat("Total runtime:", round(difftime(Sys.time(), report_render_start_time, units = "mins"), 2), "minutes\n")
+sessionInfo()
+```

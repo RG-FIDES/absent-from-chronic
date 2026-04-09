@@ -211,6 +211,24 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "problemMatcher": []
     },
+    {
+      "label": "Run EDA-3 Pipeline",
+      "detail": "Run eda-3.R then render eda-3.qmd",
+      "type": "shell",
+      "command": "Rscript analysis/eda-3/eda-3.R ; quarto render analysis/eda-3/eda-3.qmd",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run EDA-4 Pipeline",
+      "detail": "Run eda-4.R then render eda-4.qmd",
+      "type": "shell",
+      "command": "Rscript analysis/eda-4/eda-4.R ; quarto render analysis/eda-4/eda-4.qmd",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
 
     // ── Log maintenance ───────────────────────────────────────────────────────
     {

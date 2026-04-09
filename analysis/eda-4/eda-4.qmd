@@ -1,0 +1,467 @@
+---
+title: "EDA 4 - Questions 5.1 and 5.2"
+subtitle: "Missing Data Analysis and Descriptive Statistics (Table 1)"
+author: "Oleksandr Koval"
+date: 2026-03-24
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    code-fold: true
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: true
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options:
+  chunk_output_type: console
+---
+
+# Mission
+
+This document **observes and documents** question **5.1** (Handling Missing Data) and question **5.2** (Descriptive Statistics — Table 1) from `stats_instructions_v3.md`, using the Ellis output in `data-private/derived/cchs-2-tables/`.
+
+The analysis addresses:
+
+-   **Section 5.1**: Apply Little's MCAR test to assess missingness patterns; document proportion of missing values per variable; visualize missingness using `naniar` functions.
+-   **Section 5.2**: Produce comprehensive descriptive statistics (Table 1) for the overall pooled sample and stratified by CCHS cycle (2011 vs. 2014), including unweighted and weighted frequencies, proportions, and outcome variable means/SDs.
+
+**Data genealogy for this report:**
+
+```         
+1-ferry.R  ──► cchs-1.sqlite ──► 2-ellis.R ──► cchs_analytical.parquet ──► EDA-4 (Q5.1, Q5.2)
+```
+
+**Research Questions:**
+
+1.  Does the data satisfy the Missing Completely At Random (MCAR) assumption? What are the key missingness patterns?
+2.  What proportion of each predictor variable is missing, and how should missing data be handled?
+3.  What are the demographic, behavioral, and health characteristics of the pooled sample and by cycle?
+4.  How do weighted and unweighted distributions differ, and what is the impact of survey weighting?
+
+```{r}
+#| label: knitr-root
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = '../../')
+```
+
+```{r}
+#| label: set_options
+#| code-summary: Report-wide formatting options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+opts_chunk$set(
+  results = 'show',
+  message = FALSE,
+  warning = FALSE,
+  comment = NA,
+  tidy = FALSE,
+  out.width = "960px",
+  fig.width = 10,
+  fig.height = 6,
+  fig.path = 'figure-png-iso/'
+)
+options(width = 100)
+ggplot2::theme_set(ggplot2::theme_minimal())
+read_chunk("analysis/eda-4/eda-4.R")
+```
+
+# Environment
+
+> Reviews the components of the working environment. Non-technical readers may skip this section.
+
+```{r}
+#| label: load-packages
+#| code-summary: Packages used in the current report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: load-sources
+#| code-summary: Collection of custom functions used in current repository
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-globals
+#| code-summary: Values used throughout the report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-functions
+#| code-summary: Custom functions defined for use in this report
+#| echo: true
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+# Data
+
+## Data Sources
+
+For complete data documentation, see the [Data Primer](../data-primer-1/data-primer-1.html).
+
+This analysis uses the Ellis output: `cchs_analytical.parquet` from `data-private/derived/cchs-2-tables/`. The table contains person-level records with survey weights, outcome variables (days absent), and predictor variables across CCHS cycles 2011 and 2014.
+
+```{r}
+#| label: load-data
+#| code-summary: Load analytical data from Ellis parquet output
+#| warning: false
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: inspect-data-0
+#| code-summary: Data overview and structure
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+## Data Context
+
+This section describes the data as it appears in this specific analysis.
+
+```{r}
+#| label: inspect-data-1
+#| code-summary: Grain verification — confirm unit of analysis
+#| code-fold: false
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: data-context-tables
+#| code-summary: Ellis tables used and rationale
+#| code-fold: true
+#| cache: true
+print(data_context_tables)
+print(data_context_grain)
+```
+
+```{r}
+#| label: data-context-person
+#| code-summary: Single-person record view
+#| code-fold: true
+#| cache: true
+print(data_context_person)
+```
+
+```{r}
+#| label: data-context-distributions
+#| code-summary: Key variable distributions for this analysis
+#| code-fold: true
+#| cache: true
+print(data_context_distributions)
+```
+
+# Analysis
+
+## Part A — Question 5.1 Handling Missing Data {#part-a}
+
+::: {.callout-note icon="false"}
+**Requirement — §5.1** (`stats_instructions_v3.md`, verbatim):
+
+Apply Little's MCAR test to assess the pattern of missingness across predictor variables.
+
+-   Document the proportion of missing values per variable
+-   Consider multiple imputation if appropriate, or treat missing values as a separate category if the proportion is small (\< 5%) and the MCAR assumption holds
+
+Suggested R package for missingness visualization: `naniar` (functions `vis_miss()`, `gg_miss_var()`, `gg_miss_upset()`).
+:::
+
+This section addresses question 5.1 by testing MCAR assumptions, documenting variable-level missingness, and visualizing missingness patterns with interactive Plotly graphics saved to `analysis/eda-4/prints/`.
+
+### Graph Family g1: Missing Data Patterns — Heatmap and Upset Plot
+
+Research Question: What is the pattern of missingness across predictor variables?
+
+```{r}
+#| label: g1-data-prep
+#| code-summary: Prepare data for missing data visualization
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: g1
+#| code-summary: Missing data heatmap (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g1-display
+#| code-summary: Render missingness heatmap (interactive)
+#| cache: false
+g1_missing_heatmap
+```
+
+### Graph Family g2: Missing Data by Variable
+
+Research Question: What proportion of each variable is missing?
+
+```{r}
+#| label: g2
+#| code-summary: Missing data by variable (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g2-display
+#| code-summary: Render missingness-by-variable chart (interactive)
+#| cache: false
+g2_missing_by_var
+```
+
+```{r}
+#| label: g21
+#| code-summary: Missingness co-occurrence patterns (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g21-display
+#| code-summary: Render missingness co-occurrence chart (interactive)
+#| cache: false
+g21_missing_upset
+```
+
+```{r}
+#| label: g22
+#| code-summary: Distribution of variable-level missingness (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g22-display
+#| code-summary: Render variable-level missingness distribution (interactive)
+#| cache: false
+g22_missing_density
+```
+
+### Table t3: Little's MCAR Test and Missing Data Summary
+
+Research Question: Does the data satisfy MCAR assumption? What are the missing data patterns?
+
+```{r}
+#| label: t3-data-prep
+#| code-summary: Prepare predictors for Little's MCAR test
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: t3
+#| code-summary: Little's MCAR test and clear missing-data summary tables
+#| eval: true
+#| cache: true
+print(t3_mcar_pretty)
+print(t3_decision)
+t3_missing_table_clear %>%
+  slice_head(n = 25) %>%
+  knitr::kable(caption = "Q5.1 Missingness summary (top variables) with <5% rule flag")
+```
+
+```{r}
+#| label: verify-q51-proof
+#| code-summary: "§5.1 PROOF: MCAR result + missingness decision diagnostics"
+#| cache: true
+q5_1_proof_table <- t3_mcar_pretty %>%
+  mutate(
+    mcar_holds = ifelse(!is.na(p_value) && p_value >= 0.05, "Yes", "No")
+  )
+
+q5_1_small_missing_proof <- missing_summary_decision %>%
+  transmute(
+    n_variables,
+    n_vars_missing,
+    max_pct_missing = scales::percent(max_pct_missing, accuracy = 0.1),
+    median_pct_missing = scales::percent(median_pct_missing, accuracy = 0.1),
+    all_lt_5pct
+  )
+
+print(q5_1_proof_table)
+print(q5_1_small_missing_proof)
+print(t3_decision)
+```
+
+### Final MCAR Decision Table (end of §5.1)
+
+```{r}
+#| label: q51-final-mcar-table
+#| code-summary: "Final clear MCAR table with p-value and decision note"
+#| cache: true
+t3_mcar_pretty %>%
+  dplyr::select(test, statistic, df, p_value, interpretation) %>%
+  knitr::kable(caption = "Final MCAR test result (Little's test): p-value and interpretation")
+
+t3_decision %>%
+  knitr::kable(caption = "Missing-data decision notes based on MCAR test and <5% rule")
+```
+
+::: {.callout-tip icon="false"}
+**§5.1 DONE — Missing-data requirements completed** ✓
+
+The report now includes: (i) Little's MCAR test output, (ii) variable-level missingness proportions, (iii) explicit decision logic for `<5%` missingness handling, and (iv) Plotly-based visuals saved in `analysis/eda-4/prints/`.
+:::
+
+------------------------------------------------------------------------
+
+## Part B — Question 5.2 Descriptive Statistics (Table 1) {#part-b}
+
+::: {.callout-note icon="false"}
+**Requirement — §5.2** (`stats_instructions_v3.md`, verbatim):
+
+Produce the following for the overall pooled sample, stratified by CCHS cycle (2011 vs. 2014):
+
+-   Unweighted frequencies and proportions for all categorical predictor variables
+-   Weighted frequencies and proportions (using survey weights)
+-   Weighted mean and standard deviation of the outcome variable (days absent)
+
+Use the `survey` package in R to correctly account for the complex sampling design.
+:::
+
+This section addresses question 5.2 with reader-friendly descriptive tables and additional visuals to clarify weighting effects and cycle-level outcome differences.
+
+### Table t1: Descriptive Statistics (Overall and Stratified by Cycle)
+
+Research Question: What are the demographic, behavioral, and health characteristics of the sample?
+
+```{r}
+#| label: t1-data-prep
+#| code-summary: Prepare categorical and continuous variables for Table 1
+#| code-fold: true
+#| eval: true
+#| cache: true
+```
+
+```{r}
+#| label: t1
+#| code-summary: Table 1 — Descriptive statistics (unweighted and weighted) stratified by CCHS cycle
+#| eval: true
+#| cache: true
+t1_table1_preview %>%
+  dplyr::arrange(variable, group, level) %>%
+  knitr::kable(caption = "Table 1: Categorical predictors (unweighted and weighted frequencies/proportions)")
+
+t1_table1_proof %>%
+  knitr::kable(caption = "Table 1 proof: proportions sum to 100% within each variable-group")
+
+t1_table1_comprehensive %>%
+  dplyr::arrange(variable, group, level) %>%
+  knitr::kable(caption = "Q5.2 comprehensive descriptive table: categorical variables (overall + by cycle; unweighted and weighted)")
+```
+
+### Table t2: Outcome Variable Descriptive Statistics
+
+Research Question: What are the outcomes (days absent) across the sample and by cycle?
+
+```{r}
+#| label: t2-data-prep
+#| code-summary: Prepare outcome variables for descriptive statistics
+#| code-fold: true
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: t2
+#| code-summary: Outcome descriptive statistics — weighted mean and SD by cycle
+#| eval: true
+#| cache: true
+t2_outcome_primary_pretty %>%
+  knitr::kable(caption = "Q5.2 outcome summary (days_absent_total): unweighted n/mean/SD and weighted mean/SE/SD")
+
+t1_outcome_comprehensive %>%
+  knitr::kable(caption = "Q5.2 comprehensive outcome descriptive table (overall + by cycle)")
+```
+
+### Static ggplot copies saved to `prints/`
+
+In addition to interactive Plotly visuals, default `ggplot2` PNG copies are saved in `analysis/eda-4/prints/` for each graph family (`g1`, `g2`, `g21`, `g22`, `g3`, `g31`).
+
+### Graph Family g3: Q5.2 Supporting Visuals
+
+```{r}
+#| label: g3
+#| code-summary: Build weighted mean outcome graph (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g3-display
+#| code-summary: Render weighted mean outcome graph (interactive)
+#| cache: false
+g3_outcome_weighted_mean_plot
+```
+
+```{r}
+#| label: g31
+#| code-summary: Build weighting-impact comparison graph (Plotly)
+#| eval: true
+#| cache: false
+```
+
+```{r}
+#| label: g31-display
+#| code-summary: Render weighting-impact comparison graph (interactive)
+#| cache: false
+g31_weighting_impact_plot
+```
+
+```{r}
+#| label: verify-q52-proof
+#| code-summary: "§5.2 PROOF: requirements checklist and survey-design evidence"
+#| cache: true
+print(t5_2_requirement_proof)
+
+t5_2_requirement_proof %>%
+  count(status) %>%
+  knitr::kable(caption = "Q5.2 requirement checklist status")
+```
+
+::: {.callout-tip icon="false"}
+**§5.2 DONE — Descriptive requirements completed** ✓
+
+The report now provides unweighted and weighted categorical distributions, weighted outcome mean/SD, cycle stratification, and explicit proof checks that the required outputs were produced using a survey design object.
+:::
+
+------------------------------------------------------------------------
+
+## Report Timeline
+
+Report started: `r report_render_start_time`
+
+Report rendered: `r Sys.time()`
+
+Total time: `r round(difftime(Sys.time(), report_render_start_time, units = "secs"), 2)` seconds
