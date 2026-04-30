@@ -196,3 +196,7 @@ analysis/eda-5/figure-png-iso/gB3-1.png
 analysis/eda-5/figure-png-iso/gB4-1.png
 analysis/eda-5/figure-png-iso/gB5-1.png
 analysis/eda-5/figure-png-iso/gB6-1.png
+
+# Website 
+!/_site/
+!/_site/**
