@@ -212,6 +212,25 @@
       "problemMatcher": []
     },
 
+    // ── Diagram rendering ─────────────────────────────────────────────────────
+    {
+      "label": "Render Pipeline Diagram",
+      "detail": "Extract <!-- PIPELINE-DIAGRAM-SOURCE --> mermaid block from manipulation/pipeline.md, render to libs/images/pipeline-architecture.jpg, then report insertion sites",
+      "type": "shell",
+      "command": "Rscript",
+      "args": [
+        "utility/render-pipeline-diagram.R"
+      ],
+      "isBackground": false,
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
     // ── Log maintenance ───────────────────────────────────────────────────────
     {
       "label": "Clean Expired Logs",

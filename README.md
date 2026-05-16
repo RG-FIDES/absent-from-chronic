@@ -45,6 +45,12 @@ powershell -ExecutionPolicy Bypass -File scripts/ps1/run-interactive-flow.ps1
 
 See `manipulation/pipeline.md` for the full pipeline reference including input/output tables, white-list design, exclusion criteria, and troubleshooting.
 
+<!-- PIPELINE-DIAGRAM -->
+![Pipeline Architecture](libs/images/pipeline-architecture.jpg)
+
+> Diagram source: [manipulation/pipeline.md](manipulation/pipeline.md) — render with the
+> **Render Pipeline Diagram** VS Code task or `Rscript utility/render-pipeline-diagram.R`
+
 ### Running the analysis scripts (`analysis/`)
 
 Analysis scripts live in numbered subdirectories under `analysis/`. Each folder contains an `.R` script (data loading and modeling) and a `.qmd` Quarto report.

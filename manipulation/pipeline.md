@@ -291,3 +291,54 @@ After running `2-ellis.R`, verify these values match expectations:
 ---
 
 *Last updated: 2026-03-20 (post Ellis revision — 62-column, 63,843-row output)*
+
+---
+
+## Pipeline Architecture
+
+<!-- PIPELINE-DIAGRAM-SOURCE -->
+```mermaid
+flowchart LR
+    subgraph "Metadata"
+        META["extract-metadata.R<br/><i>Codebook CSVs</i>"]
+    end
+    subgraph "Ingestion"
+        FERRY["1-ferry.R<br/><i>Import SAV → SQLite</i>"]
+    end
+    subgraph "Transformation"
+        ELLIS["2-ellis.R<br/><i>Recode &amp; Shape</i>"]
+    end
+    subgraph "Exploration"
+        TEST["2-test-ellis-cache.R<br/><i>Validate Cache</i>"]
+        EDA2["eda-2.qmd<br/><i>Ferry + Ellis EDA</i>"]
+        EDA["eda-1/3/4/5.qmd<br/><i>Deep Analysis</i>"]
+        PRIMER["data-primer-1<br/><i>Data Reference</i>"]
+    end
+    subgraph "Delivery"
+        BINDER["binder-1/2<br/><i>Reports</i>"]
+        SITE["_frontend-1/2<br/><i>Static Sites</i>"]
+    end
+
+    META --> FERRY --> ELLIS --> BINDER --> SITE
+    FERRY -.->|informs| EDA2
+    ELLIS -.->|informs| TEST
+    ELLIS -.->|informs| EDA2
+    ELLIS -.->|informs| EDA
+    ELLIS -.->|informs| PRIMER
+    EDA2 -.->|informs| BINDER
+    EDA -.->|informs| BINDER
+    PRIMER -.->|informs| BINDER
+
+    style META fill:#4a90d9,color:#fff
+    style FERRY fill:#4a90d9,color:#fff
+    style ELLIS fill:#4a90d9,color:#fff
+    style TEST fill:#f5a623,color:#fff
+    style EDA2 fill:#f5a623,color:#fff
+    style EDA fill:#f5a623,color:#fff
+    style PRIMER fill:#f5a623,color:#fff
+    style BINDER fill:#50c878,color:#fff
+    style SITE fill:#50c878,color:#fff
+```
+
+> Rendered to `libs/images/pipeline-architecture.jpg` — run the **Render Pipeline Diagram**
+> VS Code task or `Rscript utility/render-pipeline-diagram.R`
