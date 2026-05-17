@@ -142,7 +142,7 @@ ds_rail  <- tibble::tribble(
   # to data-public/derived/cchs-metadata/.  Run once; re-run if SAV files change.
   # Outputs are the source-of-truth for variable/value code decisions in Ellis.
 
-  "run_r"     , "manipulation/extract-metadata.R",     # Codebook: SAV metadata → cchs_variable_labels.csv + cchs_value_labels.csv
+  "run_r"     , "manipulation/0-extract-metadata.R",   # Codebook: SAV metadata → cchs_variable_labels.csv + cchs_value_labels.csv
 
   # ===============================
   # PHASE 1: DATA MANIPULATION
@@ -151,7 +151,7 @@ ds_rail  <- tibble::tribble(
   "run_r"     , "manipulation/1-ferry.R",              # Ferry: CCHS .sav files → cchs-1.sqlite (zero transformation)
   "run_r"     , "manipulation/2-ellis.R",              # Ellis Lane 2: white-list + recode → cchs-2.sqlite + Parquet
   # "run_r"     , "manipulation/3-ellis.R",              # Ellis Lane 3: clarity layer + splits → cchs-3.sqlite + Parquet
- # "run_r_soft", "manipulation/2-test-ellis-cache.R",   # Ellis validation (non-blocking in flow)
+ # "run_r_soft", "manipulation/3-test-ellis-cache.R",   # Ellis validation (non-blocking in flow)
   # "run_r_soft", "manipulation/example/ellis-lane-example.R",   # Ellis pattern example (non-blocking in flow)
   
   # ===============================

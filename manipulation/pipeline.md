@@ -15,7 +15,7 @@ CCHS .sav files (data-private/raw/)
          ▼  2-ellis.R   ← white-list + harmonize + recode
   cchs-2.sqlite + cchs-2-tables/*.parquet   (analysis-ready)
          │
-         ▼  2-test-ellis-cache.R   ← alignment verification
+         ▼  3-test-ellis-cache.R   ← alignment verification
   console report (pass/fail)
 ```
 
@@ -25,9 +25,10 @@ CCHS .sav files (data-private/raw/)
 
 | # | File | Pattern | Output |
 |---|------|---------|--------|
+| 0 | `manipulation/0-extract-metadata.R` | Discovery | Codebook CSVs in `data-public/derived/cchs-metadata/` |
 | 1 | `manipulation/1-ferry.R` | Ferry | `data-private/derived/cchs-1.sqlite` + `cchs-1-raw/` Parquet backup |
 | 2 | `manipulation/2-ellis.R` | Ellis | `data-private/derived/cchs-2.sqlite` + `cchs-2-tables/` Parquet |
-| 3 | `manipulation/2-test-ellis-cache.R` | Test | Console test report (three-way alignment check) |
+| 3 | `manipulation/3-test-ellis-cache.R` | Test | Console test report (three-way alignment check) |
 | — | `manipulation/example/ferry-lane-example.R` | Example | `cchs-1.sqlite` (demo only; does not affect main pipeline) |
 | — | `manipulation/example/ellis-lane-example.R` | Example | `cchs-2.sqlite` (demo only; does not affect main pipeline) |
 
@@ -97,14 +98,15 @@ Runs ferry → ellis → all downstream analyses in sequence.
 source("manipulation/1-ferry.R")            # ~2–5 min depending on file size
 source("manipulation/2-ellis.R")            # ~1–2 min
 # source("manipulation/3-ellis.R")          # ~1 min — optional clarity layer
-source("manipulation/2-test-ellis-cache.R") # <30 sec
+source("manipulation/3-test-ellis-cache.R") # <30 sec
 ```
 
 ### Option C: VS Code Tasks
 Use the tasks defined in `.vscode/tasks.json`:
+- **Run Extract Metadata (Lane 0)** — `Rscript manipulation/0-extract-metadata.R`
 - **Run Ferry Lane 1** — `Rscript manipulation/1-ferry.R`
 - **Run Ellis Lane 2** — `Rscript manipulation/2-ellis.R`
-- **Test Ellis ↔ CACHE-Manifest Alignment** — `Rscript manipulation/2-test-ellis-cache.R`
+- **Run Test Ellis Cache (Lane 3)** — `Rscript manipulation/3-test-ellis-cache.R`
 
 ### Option D: Interactive Pipeline (run-interactive-flow.ps1)
 The interactive runner asks three questions before launching `flow.R`:
@@ -274,7 +276,7 @@ After running `2-ellis.R`, verify these values match expectations:
   Adjust `dhhgage %in% 2:15` in `tweak-data-2-exclusions` accordingly.
 
 **SQLite and Parquet row counts don't match**  
-→ Run `manipulation/2-test-ellis-cache.R` — it will identify the parity failure specifically.
+→ Run `manipulation/3-test-ellis-cache.R` — it will identify the parity failure specifically.
   Re-run `2-ellis.R` to regenerate both outputs atomically.
 
 ---
@@ -300,7 +302,7 @@ After running `2-ellis.R`, verify these values match expectations:
 ```mermaid
 flowchart LR
     subgraph "Metadata"
-        META["extract-metadata.R<br/><i>Codebook CSVs</i>"]
+        META["0-extract-metadata.R<br/><i>Codebook CSVs</i>"]
     end
     subgraph "Ingestion"
         FERRY["1-ferry.R<br/><i>Import SAV → SQLite</i>"]
@@ -309,7 +311,7 @@ flowchart LR
         ELLIS["2-ellis.R<br/><i>Recode &amp; Shape</i>"]
     end
     subgraph "Exploration"
-        TEST["2-test-ellis-cache.R<br/><i>Validate Cache</i>"]
+        TEST["3-test-ellis-cache.R<br/><i>Validate Cache</i>"]
         EDA2["eda-2.qmd<br/><i>Ferry + Ellis EDA</i>"]
         EDA["eda-1/3/4/5.qmd<br/><i>Deep Analysis</i>"]
         PRIMER["data-primer-1<br/><i>Data Reference</i>"]

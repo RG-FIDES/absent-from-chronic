@@ -49,7 +49,7 @@
 #' ============================================================================
 
 #+ echo=F
-# rmarkdown::render(input = "./manipulation/extract-metadata.R") # run to knit
+# rmarkdown::render(input = "./manipulation/0-extract-metadata.R") # run to knit
 # ---- setup -------------------------------------------------------------------
 rm(list = ls(all.names = TRUE))
 cat("\014")

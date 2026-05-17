@@ -172,6 +172,16 @@
       "problemMatcher": []
     },
     {
+      "label": "Run Extract Metadata (Lane 0)",
+      "detail": "Harvest SPSS variable/value labels → codebook CSVs (manipulation/0-extract-metadata.R)",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["manipulation/0-extract-metadata.R"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
       "label": "Run Ferry Lane 1",
       "detail": "Import CCHS .sav files → cchs-1.sqlite (manipulation/1-ferry.R)",
       "type": "shell",
@@ -187,6 +197,16 @@
       "type": "shell",
       "command": "Rscript",
       "args": ["manipulation/2-ellis.R"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Test Ellis Cache (Lane 3)",
+      "detail": "Three-way alignment test: code ↔ disk ↔ CACHE-manifest (manipulation/3-test-ellis-cache.R)",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["manipulation/3-test-ellis-cache.R"],
       "group": "build",
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "problemMatcher": []
