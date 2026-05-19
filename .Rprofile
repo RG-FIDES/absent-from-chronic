@@ -2,7 +2,12 @@
 # languageserver reads this option when calling callr::r_session$new(wait_timeout = ...).
 options(languageserver.server_timeout = 300)
 
-# Reduce renv startup overhead (suppress status messages that add initialization time).
-options(renv.config.startup.quiet = TRUE)
+# Reduce renv startup overhead: suppress status messages and skip sync check.
+# synchronized.check = FALSE skips the lockfile comparison that adds ~2s to startup,
+# keeping total renv activation under callr's 3-second session wait_timeout.
+options(
+  renv.config.startup.quiet     = TRUE,
+  renv.config.synchronized.check = FALSE
+)
 
 source("renv/activate.R")
