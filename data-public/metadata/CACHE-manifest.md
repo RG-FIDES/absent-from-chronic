@@ -4,7 +4,7 @@ This document describes the analysis-ready dataset produced by `manipulation/2-e
 It is the authoritative reference for downstream analyses in `analysis/`.
 
 > **Status**: Populated — statistics refreshed from `2-ellis.R` run 2026-05-20
-> (after SDCFIMM fix). All 24 tests passing.
+> (after SDCFIMM fix; data-primer-1 extension adds 4 facilitating vars + ADL rename + work_stress). All 24 tests passing.
 
 ## Output Summary
 
@@ -15,7 +15,7 @@ It is the authoritative reference for downstream analyses in `analysis/`.
 | Parquet file | `data-private/derived/cchs-2-tables/cchs_analytic.parquet` |
 | Sample flow table | `cchs-2.sqlite` (table: `sample_flow`) + `sample_flow.parquet` |
 | Unit of observation | One row per CCHS respondent |
-| Columns | 65 |
+| Columns | 69 |
 | Analytic n (unweighted) | 63,843 |
 | Weighted N (sum of `wts_m_pooled`) | 17,844,913 |
 | CCHS cycles pooled | 2010-2011 and 2013-2014 |
@@ -159,6 +159,10 @@ subset the 42,064 rows where all 17 indicators are non-NA.
 | `income_hh` | `INCGHH` | < $20K (2,392), $20-39K (8,067), $40-59K (10,520), $60-79K (10,075), $80K+ (28,372) | 59,426 |
 | `has_family_doctor` | `ACC_50A` / `HCU_1AA` | Yes (35,800), No (6,006) | 41,806 |
 | `work_schedule` | `LBSDPFT` | Full-time (47,936), Part-time (11,453) | 59,389 |
+| `employment_type` | `LBSG31` | Employee (49,698), Self-employed (10,266) | 59,964 |
+| `occupation_category` | `LBSGSOC` | Management/Education/Arts (20,850), Business/Finance (10,590), Sales/Services (14,468), Trades/Transport (8,674), Primary/Processing (5,126) | 59,708 |
+| `smoking_status` | `SMKDSTY` | Never smoked (23,446), Former (25,717), Occasional (3,460), Daily (11,117) | 63,740 |
+| `living_arrangements` | `DHHGLVG` | Couple, no children (19,395), Unattached alone (14,064), Couple with children (13,776), Child in 2-parent household (6,781), Unattached with others (2,349), Child in parent/sibling (2,354), Single parent (2,056), Other (2,713) | 63,488 |
 | `alcohol_type` | `ALCDTTM` | Regular drinker (44,214), Occasional drinker (10,245), Did not drink (9,127) | 63,586 |
 | `fruit_veg_daily` | `FVCGTOT` | Less than 5/day (36,835), 5 to 10/day (22,456), More than 10/day (2,377) | 61,668 |
 | `physical_activity` | `PACDPAI` | Active (18,610), Moderately active (16,593), Inactive (28,619) | 63,822 |
@@ -175,8 +179,13 @@ subset the 42,064 rows where all 17 indicators are non-NA.
 | `health_perceived` | `GEN_01` | Excellent (14,285), Very good (26,788), Good (18,284), Fair (3,871), Poor (575) | 63,803 |
 | `mental_health_perceived` | `GEN_02B` | Excellent (22,501), Very good (24,708), Good (13,471), Fair (2,657), Poor (433) | 63,770 |
 | `health_vs_prior_year` | `GEN_02` | Much better, Somewhat better, About the same, Somewhat worse, Much worse | — |
-| `gen_09` | `GEN_09` | Raw code — self-perceived work stress | — |
-| `adl_01`–`adl_06` | `ADL_01`–`ADL_06` | Raw codes — activity of daily living help needed | — |
+| `work_stress` | `GEN_09` | Not at all stressful (6,407), Not very stressful (12,854), A bit stressful (27,206), Quite a bit stressful (14,419), Extremely stressful (2,697) | 63,583 |
+| `adl_meals` | `ADL_01` | No (63,349), Yes (493) | 63,842 |
+| `adl_errands` | `ADL_02` | No / Yes — needs help: appointments / errands | — |
+| `adl_housework` | `ADL_03` | No / Yes — needs help: housework | — |
+| `adl_personal_care` | `ADL_04` | No / Yes — needs help: personal care | — |
+| `adl_moving_indoors` | `ADL_05` | No / Yes — needs help: moving inside home | — |
+| `adl_finances` | `ADL_06` | No (63,358), Yes (474) | 63,832 |
 | `injured_past_12m` | `INJ_01` | No (53,204), Yes (10,603) | 63,807 |
 
 ## Survey / Cycle Variables
@@ -205,6 +214,16 @@ subset the 42,064 rows where all 17 indicators are non-NA.
   to labelled factors. Output columns are `health_perceived` (source: `GEN_01`),
   `mental_health_perceived` (source: `GEN_02B`), and `health_vs_prior_year`
   (source: `GEN_02`). Excellent / Much better is the first factor level in each.
+- `work_stress` (source: `GEN_09`) is an ordered factor with 5 levels from
+  "Not at all stressful" to "Extremely stressful". Note: this captures
+  self-perceived general work stress (not specifically job demands).
+- ADL limitation columns (`adl_meals`, `adl_errands`, `adl_housework`,
+  `adl_personal_care`, `adl_moving_indoors`, `adl_finances`) are "No"/"Yes"
+  factors. Prevalence of "Yes" is very low (~0.8%) in this employed sample.
+- `smoking_status` collapses SMKDSTY's 6 codes to 4 groups: Daily, Occasional
+  (codes 2+3), Former (codes 4+5), Never smoked.
+- `occupation_category` uses 2010 descriptive labels for both cycles; 2014 PUMF
+  labels the same 5 groups only as "GROUP 1"–"GROUP 5".
 - The 17 `cond_*` columns are logical. Use `as.integer(cond_*)` to get 0/1 for
   regression models.
 - Always use `wts_m_pooled` (not `wts_m`) for weighted analyses.

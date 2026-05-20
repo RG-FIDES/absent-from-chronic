@@ -161,7 +161,12 @@ vars_inferred <- c(
   # Student status
   "sdcg9",     # Full-time or part-time student
   # Injury
-  "inj_01"     # Injured in past 12 months
+  "inj_01",    # Injured in past 12 months
+  # Additional facilitating variables (added for data-primer-1 coverage)
+  "smkdsty",   # Smoking status — type of smoker (6-category derived)
+  "lbsg31",    # Employment type — employee vs. self-employed
+  "lbsgsoc",   # Occupation category (5-group SOC; 2014 PUMF uses group numbers only)
+  "dhhglvg"    # Living arrangements (8-level household composition)
 )
 
 cat("\n  White-list summary:\n")
@@ -735,6 +740,137 @@ if ("inj_01" %in% names(ds_analytic)) {
     )
 }
 
+# ---- recode-facilitating-extended -------------------------------------------
+# Additional facilitating variables added for data-primer-1 coverage.
+
+if ("smkdsty" %in% names(ds_analytic)) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(
+      # SMKDSTY: 1=Daily, 2=Occasional (current), 3=Always occasional (current),
+      #          4=Former daily, 5=Former occasional, 6=Never smoked
+      # Collapse to 4 analytic groups: Daily / Occasional / Former / Never
+      smoking_status = dplyr::case_when(
+        smkdsty == 1             ~ "Daily",
+        smkdsty %in% c(2, 3)    ~ "Occasional",
+        smkdsty %in% c(4, 5)    ~ "Former",
+        smkdsty == 6             ~ "Never smoked",
+        TRUE                     ~ NA_character_
+      ) %>% factor(levels = c("Never smoked", "Former", "Occasional", "Daily"))
+    )
+}
+
+if ("lbsg31" %in% names(ds_analytic)) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(
+      # LBSG31: 1=Employee, 2=Self-employed; 6/7/8/9=NA
+      employment_type = dplyr::case_when(
+        lbsg31 == 1 ~ "Employee",
+        lbsg31 == 2 ~ "Self-employed",
+        TRUE        ~ NA_character_
+      ) %>% factor(levels = c("Employee", "Self-employed"))
+    )
+}
+
+if ("lbsgsoc" %in% names(ds_analytic)) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(
+      # LBSGSOC: 5-group SOC. 2010 PUMF uses descriptive labels; 2014 uses
+      # generic GROUP 1-5 labels. Numeric codes align identically across cycles.
+      # Using 2010 descriptive labels throughout for interpretability.
+      occupation_category = dplyr::case_when(
+        lbsgsoc == 1 ~ "Management / Education / Arts",
+        lbsgsoc == 2 ~ "Business / Finance",
+        lbsgsoc == 3 ~ "Sales / Services",
+        lbsgsoc == 4 ~ "Trades / Transport",
+        lbsgsoc == 5 ~ "Primary industry / Processing",
+        TRUE         ~ NA_character_
+      ) %>% factor(levels = c(
+        "Management / Education / Arts",
+        "Business / Finance",
+        "Sales / Services",
+        "Trades / Transport",
+        "Primary industry / Processing"
+      ))
+    )
+}
+
+if ("dhhglvg" %in% names(ds_analytic)) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(
+      # DHHGLVG: 1-8 household composition; 96=NOT APPLICABLE, 99=NOT STATED
+      living_arrangements = dplyr::case_when(
+        dhhglvg == 1 ~ "Unattached, living alone",
+        dhhglvg == 2 ~ "Unattached, living with others",
+        dhhglvg == 3 ~ "Couple, no children",
+        dhhglvg == 4 ~ "Couple with children",
+        dhhglvg == 5 ~ "Single parent with child",
+        dhhglvg == 6 ~ "Child in parent / sibling household",
+        dhhglvg == 7 ~ "Child in two-parent / sibling household",
+        dhhglvg == 8 ~ "Other arrangement",
+        TRUE         ~ NA_character_
+      ) %>% factor(levels = c(
+        "Unattached, living alone",
+        "Unattached, living with others",
+        "Couple, no children",
+        "Couple with children",
+        "Single parent with child",
+        "Child in parent / sibling household",
+        "Child in two-parent / sibling household",
+        "Other arrangement"
+      ))
+    )
+}
+
+# ---- recode-work-stress ------------------------------------------------------
+# GEN_09: self-perceived work stress (5-point scale)
+# Already in vars_inferred as raw integer. Recode to labelled ordered factor.
+if ("gen_09" %in% names(ds_analytic)) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(
+      # GEN_09: 1=Not at all, 2=Not very, 3=A bit, 4=Quite a bit, 5=Extremely
+      work_stress = dplyr::case_when(
+        gen_09 == 1 ~ "Not at all stressful",
+        gen_09 == 2 ~ "Not very stressful",
+        gen_09 == 3 ~ "A bit stressful",
+        gen_09 == 4 ~ "Quite a bit stressful",
+        gen_09 == 5 ~ "Extremely stressful",
+        TRUE        ~ NA_character_
+      ) %>% factor(
+        levels  = c("Not at all stressful", "Not very stressful",
+                    "A bit stressful", "Quite a bit stressful",
+                    "Extremely stressful"),
+        ordered = TRUE
+      )
+    )
+}
+
+# ---- recode-adl --------------------------------------------------------------
+# Recode ADL_01-ADL_06 from raw integer codes to Yes/No factors and
+# rename to semantic column names for clarity in analysis and reporting.
+adl_raw_vars <- c("adl_01", "adl_02", "adl_03", "adl_04", "adl_05", "adl_06")
+if (all(adl_raw_vars %in% names(ds_analytic))) {
+  ds_analytic <- ds_analytic %>%
+    dplyr::mutate(dplyr::across(
+      dplyr::all_of(adl_raw_vars),
+      ~dplyr::case_when(
+        . == 1 ~ "Yes",
+        . == 2 ~ "No",
+        TRUE   ~ NA_character_
+      ) %>% factor(levels = c("No", "Yes"))
+    )) %>%
+    dplyr::rename(
+      adl_meals         = adl_01,  # Needs help: preparing meals
+      adl_errands       = adl_02,  # Needs help: appointments / errands
+      adl_housework     = adl_03,  # Needs help: housework
+      adl_personal_care = adl_04,  # Needs help: personal care
+      adl_moving_indoors = adl_05, # Needs help: moving inside home
+      adl_finances      = adl_06   # Needs help: personal finances
+    )
+  cat("  ADL columns recoded to Yes/No factors and renamed to semantic names.\n")
+} else {
+  cat("  SKIP: ADL columns not all present — skipping ADL recode/rename.\n")
+}
+
 cat("\n---- SECTION: Final Dataset Assembly ---------------------------------\n")
 # ---- assemble-final ----------------------------------------------------------
 # Select the analysis-ready columns for output.
@@ -754,17 +890,20 @@ ds_out <- ds_analytic %>%
     age_group_3, dhhgage, sex, marital_status, household_size,
     dplyr::any_of(c("dhhgle5","dhhg611","dhhgl12")),
     province, income_hh,
-    dplyr::any_of(c("education","immigration_status","visible_minority",
-                    "has_family_doctor","work_schedule")),
+    dplyr::any_of(c("living_arrangements")),
+    dplyr::any_of(c("education", "immigration_status", "visible_minority",
+                    "has_family_doctor", "work_schedule",
+                    "employment_type", "occupation_category")),
     # Health behaviours
-    dplyr::any_of(c("bmi_category","hwtgbmi","alcohol_type",
-                    "fruit_veg_daily","physical_activity")),
-    # Perceived health
-    dplyr::any_of(c("health_perceived","mental_health_perceived",
-                    "health_vs_prior_year","gen_09")),
-    # Functional limitations
-    dplyr::any_of(c("adl_01","adl_02","adl_03","adl_04","adl_05","adl_06",
-                    "functional_limitation","injured_past_12m")),
+    dplyr::any_of(c("bmi_category", "hwtgbmi", "alcohol_type",
+                    "fruit_veg_daily", "physical_activity", "smoking_status")),
+    # Perceived health + work stress
+    dplyr::any_of(c("health_perceived", "mental_health_perceived",
+                    "health_vs_prior_year", "work_stress")),
+    # Functional limitations (ADL module — semantic names after recode)
+    dplyr::any_of(c("adl_meals", "adl_errands", "adl_housework",
+                    "adl_personal_care", "adl_moving_indoors", "adl_finances",
+                    "functional_limitation", "injured_past_12m")),
     # Completeness flags (use to subset for analysis-ready subsamples)
     flag_complete_ccc, flag_complete_predictors, flag_analytic_complete
   )
