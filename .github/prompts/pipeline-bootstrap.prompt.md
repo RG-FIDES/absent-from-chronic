@@ -45,7 +45,7 @@ Create or update `manipulation/0-extract-metadata.R`:
 
 - Read raw files with labels preserved (e.g., `haven::read_sav(path, user_na = TRUE)`)
 - Extract variable labels (`attr(col, "label")`) and value labels (`attr(col, "labels")`)
-- Write codebook CSVs to `data-public/derived/` (variable labels, value labels, cross-source diffs)
+- Write codebook CSVs to `data-private/derived/` (variable labels, value labels, cross-source diffs)
 - Follow `r-scripts.instructions.md` conventions (preamble, chunk markers)
 
 ### Step 4: Scaffold Ferry Script

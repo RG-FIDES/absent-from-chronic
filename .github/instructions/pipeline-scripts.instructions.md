@@ -67,7 +67,7 @@ The metadata extraction script (`0-extract-metadata.R`):
 
 - Read raw files with labels preserved (`haven::read_sav(path, user_na = TRUE)`)
 - Extract both variable labels and value labels
-- Write codebook CSVs to `data-public/derived/` (not `data-private/`)
+- Write codebook CSVs to `data-private/derived/` (not `data-public/`)
 - Compare label sets across sources to detect cross-cycle discrepancies
 
 ## Companion Documents

@@ -35,7 +35,7 @@ output_jpg <- "libs/images/pipeline-architecture.jpg"
 
 width_in  <- 8.5    # output width  in inches
 height_in <- 2.5    # output height in inches
-dpi       <- 150    # resolution  (150 dpi → 1275 × 375 px at defaults)
+dpi       <- 300    # resolution  (300 dpi → 2550 × 750 px at defaults)
 
 # ── 1. Extract the ```mermaid block tagged with <!-- PIPELINE-DIAGRAM-SOURCE -->
 lines      <- readLines(source_md, warn = FALSE)

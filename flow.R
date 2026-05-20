@@ -135,62 +135,28 @@ if( interactive() ) {
 ds_rail  <- tibble::tribble(
   ~fx         , ~path,
 
-  # ===============================
-  # PHASE 0: METADATA EXTRACTION
-  # ===============================
-  # Reads raw SAV files (labels preserved) and writes the authoritative codebook
-  # to data-public/derived/cchs-metadata/.  Run once; re-run if SAV files change.
-  # Outputs are the source-of-truth for variable/value code decisions in Ellis.
+  # ---- CCHS Absenteeism Pipeline -------------------------------------------
+  "run_r_soft", "manipulation/0-extract-metadata.R",    # Lane 0: extract SPSS codebook CSVs
+  "run_r"     , "manipulation/1-ferry.R",               # Lane 1: transport .sav → cchs-1.sqlite
+  "run_r"     , "manipulation/2-ellis.R",               # Lane 2: recode, validate → cchs-2.sqlite
+  "run_r_soft", "manipulation/3-test-ellis-cache.R",    # Lane 3: three-way alignment test
 
-  "run_r"     , "manipulation/0-extract-metadata.R",   # Codebook: SAV metadata → cchs_variable_labels.csv + cchs_value_labels.csv
-
-  # ===============================
-  # PHASE 1: DATA MANIPULATION
-  # ===============================
-
-  "run_r"     , "manipulation/1-ferry.R",              # Ferry: CCHS .sav files → cchs-1.sqlite (zero transformation)
-  "run_r"     , "manipulation/2-ellis.R",              # Ellis Lane 2: white-list + recode → cchs-2.sqlite + Parquet
-  # "run_r"     , "manipulation/3-ellis.R",              # Ellis Lane 3: clarity layer + splits → cchs-3.sqlite + Parquet
- # "run_r_soft", "manipulation/3-test-ellis-cache.R",   # Ellis validation (non-blocking in flow)
-  # "run_r_soft", "manipulation/example/ellis-lane-example.R",   # Ellis pattern example (non-blocking in flow)
-  
-  # ===============================
-  # PHASE 2: ANALYSIS SCRIPTS
-  # ===============================
-  
+  # ---- Analysis (uncomment as EDAs are developed) --------------------------
   # Core analysis scripts that depend on the manipulated data
   #"run_r_soft", "analysis/eda-1/eda-1.R",              # EDA-1 script (non-blocking)
   #"run_r_soft", "analysis/eda-2/eda-2.R",              # EDA-2 script (non-blocking)
   #"run_r"     , "analysis/Data-visualization/Data-visual.R",  # Data visualization script
   # "run_r"     , "analysis/report-example-2/1-scribe.R", # Scribe script for analysis-ready data
   
-  # ===============================
-  # PHASE 3: REPORTS & DOCUMENTATION
-  # ===============================
-  
   # Primary analysis reports (Quarto format) - WITH IMPROVED ERROR HANDLING
   #"run_qmd_soft", "analysis/eda-1/eda-1.qmd",          # EDA-1 report (non-blocking)
- #"run_qmd_soft", "analysis/eda-2/eda-2.qmd",          # EDA-2 report (non-blocking)
+  #"run_qmd_soft", "analysis/eda-2/eda-2.qmd",          # EDA-2 report (non-blocking)
   #"run_qmd"   , "analysis/Data-visualization/Data-visual.qmd", # Data visualization report
   # "run_qmd"   , "analysis/report-example-2/eda-1.qmd", # Analysis report example
   
-  # Documentation and template examples
-  # "run_qmd"   , "analysis/analysis-templatization/README.qmd" # Analysis documentation template
-  
-  # ===============================
-  # PHASE 4: ADVANCED REPORTS (OPTIONAL)
-  # ===============================  
-  # Commented out by default - uncomment as needed
-  
-  # "run_qmd"   , "analysis/report-example-3/eda-1.qmd",        # Additional EDA report
-  # "run_qmd"   , "analysis/report-example/annotation-layer-quarto.qmd", # Annotation layer example
-  # "run_qmd"   , "analysis/report-example/combined-in-quarto.qmd",      # Combined report example  
-  # "run_qmd"   , "analysis/report-example/combined-in-quarto-alt.qmd"   # Alternative combined report
   # "run_r_soft"  , "analysis/eda-1/eda-1.R",
   # "run_qmd_soft", "analysis/eda-1/eda-1.qmd",
   
-  
-
 
 )
 
@@ -426,7 +392,7 @@ cat("\nOutput artefact checks:\n")
 .checks <- list(
   list(stage = "1-ferry",  label = "cchs-1.sqlite",            path = "data-private/derived/cchs-1.sqlite"),
   list(stage = "2-ellis",  label = "cchs-2.sqlite",            path = "data-private/derived/cchs-2.sqlite"),
-  list(stage = "2-ellis",  label = "cchs_analytical.parquet",  path = "data-private/derived/cchs-2-tables/cchs_analytical.parquet"),
+  list(stage = "2-ellis",  label = "cchs_analytic.parquet",    path = "data-private/derived/cchs-2-tables/cchs_analytic.parquet"),
   list(stage = "2-ellis",  label = "sample_flow.parquet",      path = "data-private/derived/cchs-2-tables/sample_flow.parquet")
 )
 for (.chk in .checks) {

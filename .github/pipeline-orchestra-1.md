@@ -104,7 +104,7 @@ Before invoking the agent:
 
 **Human actions**:
 
-1. Run `0-extract-metadata.R` → inspect codebook CSVs in `data-public/derived/`
+1. Run `0-extract-metadata.R` → inspect codebook CSVs in `data-private/derived/`
 2. Run `1-ferry.R` → inspect staging database
 3. Report any issues back to agent
 
@@ -123,11 +123,27 @@ Before invoking the agent:
 2. What outcome variable(s) need construction? (sums, composites, caps)
 3. What exclusion criteria define the analytical sample?
 4. What factor recoding is needed? (reference codebook metadata from Phase 1)
+5. **Codebook verification**: For every variable used in a filter, comparison operator, or
+   recode, open the codebook CSV (`data-private/derived/codebook-value-labels.csv`) and
+   record the exact code→label mapping before writing any `case_when` or `filter` logic.
 
 **Agent actions**:
 
 1. Read ferry output schema and codebook CSVs
-2. Scaffold `2-ellis.R` with all required sections:
+2. **Codebook audit pass**: For each variable in the white-lists, extract its code→label
+   table from the codebook CSV. Flag two categories of risk before writing any recode:
+   - **Code-range overlap**: Variables whose valid code range overlaps with standard CCHS
+     special codes (6, 7, 8, 9, 96–99). For example, `DHHGAGE` uses codes 1–16 where
+     6=30–34 yrs, 7=35–39 yrs, 8=40–44 yrs, 9=45–49 yrs are *valid* age groups, not
+     missing-data flags. These variables must never be included in bulk `dplyr::across()`
+     NA-recoding; they require individual handling.
+   - **Category codes masquerading as quantities**: Variables where the numeric code
+     represents a labelled category (e.g., `DHHGAGE` codes 1–16 = age *groups*, `FVCGTOT`
+     codes 1–3 = frequency *tiers*, `INCGHH` codes 1–5 = income *brackets*). Range
+     filters (`filter(var >= X)`) must use **code values**, not natural unit values.
+     Comparing `dhhgage >= 15` (intending "age ≥ 15 years") is incorrect when the
+     minimum valid code is 1; the correct filter is `dhhgage >= 2` (code 2 = 15–17 yrs).
+3. Scaffold `2-ellis.R` with all required sections:
    - Two-tier white-list (CONFIRMED + INFERRED)
    - Cross-cycle variable harmonization (alias resolution)
    - Factor recode blocks with explicit level definitions
@@ -135,13 +151,19 @@ Before invoking the agent:
    - Sample exclusion pipeline with `sample_flow` audit table
    - Survey weight adjustment (if pooling multiple cycles)
    - Data validation assertions
-3. Human runs Ellis, inspects output, reports issues
-4. Agent refines → human re-runs → iterate until stable
+4. Human runs Ellis, inspects output, reports issues
+5. Agent refines → human re-runs → iterate until stable
 
 **Ellis Pattern requirements**:
 
-- Every variable recoded with explicit factor levels
-- CCHS special codes (6, 7, 8, 9, 96–99) mapped to NA
+- Every variable recoded with explicit factor levels verified against the codebook CSV
+- CCHS special codes (6, 7, 8, 9, 96–99) mapped to NA — but **only for variables whose
+  valid code range does not overlap these values** (see codebook audit pass above)
+- Range filters (`filter(var >= X)`) must use **code values**, not natural/unit values;
+  confirm against codebook before writing any comparison operator
+- Bulk `dplyr::across()` NA recoding over multiple variables: verify that no variable in
+  the list has valid data at standard special-code positions; exclude any such variable
+  and handle it individually
 - All transformation decisions documented inline
 - `sample_flow` table tracks exclusion at each step
 

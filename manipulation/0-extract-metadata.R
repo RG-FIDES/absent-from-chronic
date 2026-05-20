@@ -1,282 +1,193 @@
-#' ---
-#' title: "Metadata Extraction: CCHS SAV Variable & Value Labels"
-#' author: "Andriy Koval"
-#' date: "2026-03-20"
-#' ---
-#'
-#' ============================================================================
-#' PURPOSE: Extract authoritative variable and value label metadata from the
-#'   raw CCHS SPSS (.sav) files. Output is the source-of-truth codebook for
-#'   variable coding decisions in Ellis (2-ellis.R) and downstream analysis.
-#'
-#'   SPSS .sav files embed two kinds of metadata:
-#'     - Variable label  : attr(col, "label")   — human description of what the
-#'                         variable measures (e.g. "Age - (G)")
-#'     - Value labels    : attr(col, "labels")  — named numeric vector mapping
-#'                         integer codes to text categories (e.g. 2 = "15 TO 17 YEARS")
-#'
-#'   This script reads both CCHS cycles WITHOUT stripping labels (no zap_labels),
-#'   harvests all label metadata, and writes structured CSVs that can be:
-#'     - Inspected in Excel / R to look up any variable's coding scheme
-#'     - Diffed across cycles to find where codes changed between 2010 and 2014
-#'     - Referenced in comments of 2-ellis.R to cite verified code mappings
-#'
-#' ============================================================================
-#'
-#' **Input**:
-#'   ./data-private/raw/2026-02-19/CCHS2010_LOP.sav       (2010-2011 cycle)
-#'   ./data-private/raw/2026-02-19/CCHS_2014_EN_PUMF.sav  (2013-2014 cycle)
-#'
-#' **Output** (data-public/derived/cchs-metadata/):
-#'   cchs_variable_labels.csv  — one row per (cycle × variable);
-#'                               columns: cycle, variable_name, variable_label,
-#'                               has_value_labels, n_value_labels
-#'
-#'   cchs_value_labels.csv     — one row per (cycle × variable × value code);
-#'                               columns: cycle, variable_name, value_code,
-#'                               value_label
-#'
-#'   cchs_value_label_diffs.csv — value label differences between cycles;
-#'                                empty if labels are identical for a variable
-#'
-#' **Reference**:
-#'   Extract labels for a single variable interactively:
-#'     library(haven)
-#'     d <- read_sav("data-private/raw/2026-02-19/CCHS2010_LOP.sav", n_max = 1)
-#'     attr(d[["DHHGAGE"]], "labels")   # value labels
-#'     attr(d[["DHHGAGE"]], "label")    # variable label
-#'
-#' ============================================================================
+rm(list = ls(all.names = TRUE)) # Clear the memory of variables from previous run.
+cat("\014") # Clear the console
+cat("Working directory: ", getwd()) # Must be set to Project Directory
 
-#+ echo=F
-# rmarkdown::render(input = "./manipulation/0-extract-metadata.R") # run to knit
-# ---- setup -------------------------------------------------------------------
-rm(list = ls(all.names = TRUE))
-cat("\014")
-
+# ---- load-packages -----------------------------------------------------------
 library(magrittr)
 library(dplyr)
+library(tidyr)
+library(readr)
 requireNamespace("haven")
+requireNamespace("labelled")
+requireNamespace("config")
 requireNamespace("fs")
 
-script_start <- Sys.time()
-verbose      <- TRUE
-vcat         <- function(...) if (verbose) cat(...)
-
-# ---- load-sources ------------------------------------------------------------
-project_root <- if (dir.exists("scripts") && dir.exists("manipulation")) {
-  "."
-} else if (dir.exists("../scripts") && dir.exists("../manipulation")) {
-  ".."
-} else {
-  stop("Cannot locate project root. Run from project root or from manipulation/.")
-}
-
 # ---- declare-globals ---------------------------------------------------------
+config <- config::get()
 
-path_sav_2010 <- file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS2010_LOP.sav")
-path_sav_2014 <- file.path(project_root, "data-private", "raw", "2026-02-19", "CCHS_2014_EN_PUMF.sav")
+path_2010 <- config$raw_data$cchs_2010
+path_2014 <- config$raw_data$cchs_2014
 
-output_dir <- file.path(project_root, "data-public", "derived", "cchs-metadata")
-if (!fs::dir_exists(output_dir)) fs::dir_create(output_dir, recurse = TRUE)
-
-path_out_variable_labels <- file.path(output_dir, "cchs_variable_labels.csv")
-path_out_value_labels    <- file.path(output_dir, "cchs_value_labels.csv")
-path_out_diffs           <- file.path(output_dir, "cchs_value_label_diffs.csv")
+output_dir <- "./data-private/derived/"
+if (!fs::dir_exists(output_dir)) fs::dir_create(output_dir, recursive = TRUE)
 
 # ---- declare-functions -------------------------------------------------------
-
-# Extract variable labels (one row per variable) from a haven-labelled data frame.
-extract_variable_labels <- function(data, cycle_label) {
-  purrr::map_dfr(names(data), function(var) {
-    col   <- data[[var]]
-    vlabs <- attr(col, "labels")
-    tibble::tibble(
-      cycle            = cycle_label,
-      variable_name    = var,
-      variable_label   = attr(col, "label") %||% NA_character_,
-      has_value_labels = !is.null(vlabs),
-      n_value_labels   = if (!is.null(vlabs)) length(vlabs) else 0L
-    )
-  })
+# Extract variable-level metadata from a labelled data frame
+extract_var_labels <- function(ds, cycle_label) {
+  var_labels <- labelled::var_label(ds)
+  tibble::tibble(
+    variable_name  = names(var_labels),
+    variable_label = as.character(var_labels),
+    cycle          = cycle_label,
+    col_type       = purrr::map_chr(ds, ~class(.x)[1])
+  )
 }
 
-# Extract value labels (one row per variable × code) from a haven-labelled data frame.
-extract_value_labels <- function(data, cycle_label) {
-  purrr::map_dfr(names(data), function(var) {
-    vlabs <- attr(data[[var]], "labels")
-    if (is.null(vlabs) || length(vlabs) == 0L) return(NULL)
-    tibble::tibble(
-      cycle         = cycle_label,
-      variable_name = var,
-      value_code    = as.numeric(vlabs),
-      value_label   = names(vlabs)
-    )
-  })
-}
-
-# Null-coalescing helper (base R analogue of rlang::`%||%`)
-`%||%` <- function(x, y) if (!is.null(x) && length(x) > 0L) x else y
-
-# ==============================================================================
-# SECTION 1: READ SAV FILES (LABELS PRESERVED)
-# ==============================================================================
-
-vcat("\n", strrep("=", 70), "\n")
-vcat("SECTION 1: Reading SAV files (labels preserved)\n")
-vcat(strrep("=", 70), "\n")
-
-for (path in c(path_sav_2010, path_sav_2014)) {
-  if (!file.exists(path)) {
-    stop("Source file not found: ", path)
+# Extract value-level labels from a labelled data frame
+extract_val_labels <- function(ds, cycle_label) {
+  val_labels <- labelled::val_labels(ds)
+  # Keep only variables that have value labels defined
+  has_labels <- purrr::keep(val_labels, ~length(.x) > 0)
+  if (length(has_labels) == 0) {
+    return(tibble::tibble(
+      variable_name = character(),
+      value_code    = numeric(),
+      value_label   = character(),
+      cycle         = character()
+    ))
   }
+  purrr::imap_dfr(has_labels, function(labels_vec, var_name) {
+    tibble::tibble(
+      variable_name = var_name,
+      value_code    = as.numeric(labels_vec),
+      value_label   = names(labels_vec),
+      cycle         = cycle_label
+    )
+  })
 }
 
-vcat("  Loading CCHS 2010-2011 (n_max=1 for metadata only)...\n")
-ds_2010_meta <- haven::read_sav(path_sav_2010, n_max = 1L)
+cat("\n---- SECTION: Load SPSS files ----------------------------------------\n")
+cat("Reading CCHS 2010 from:", path_2010, "\n")
+ds_2010 <- haven::read_sav(path_2010, user_na = TRUE)
+cat("  Rows:", nrow(ds_2010), "  Cols:", ncol(ds_2010), "\n")
 
-vcat("  Loading CCHS 2013-2014 (n_max=1 for metadata only)...\n")
-ds_2014_meta <- haven::read_sav(path_sav_2014, n_max = 1L)
+cat("Reading CCHS 2014 from:", path_2014, "\n")
+ds_2014 <- haven::read_sav(path_2014, user_na = TRUE)
+cat("  Rows:", nrow(ds_2014), "  Cols:", ncol(ds_2014), "\n")
 
-vcat(sprintf("  CCHS 2010-2011: %d variables\n", ncol(ds_2010_meta)))
-vcat(sprintf("  CCHS 2013-2014: %d variables\n", ncol(ds_2014_meta)))
+# ---- extract-variable-labels -------------------------------------------------
+cat("\n---- SECTION: Extract variable labels --------------------------------\n")
+ds_var_2010 <- extract_var_labels(ds_2010, "CCHS_2010")
+ds_var_2014 <- extract_var_labels(ds_2014, "CCHS_2014")
 
-# ==============================================================================
-# SECTION 2: EXTRACT METADATA
-# ==============================================================================
+ds_var_combined <- dplyr::bind_rows(ds_var_2010, ds_var_2014)
 
-vcat("\n", strrep("=", 70), "\n")
-vcat("SECTION 2: Extracting metadata\n")
-vcat(strrep("=", 70), "\n")
+readr::write_csv(
+  ds_var_combined,
+  file.path(output_dir, "codebook-variable-labels.csv")
+)
+cat("  Written:", file.path(output_dir, "codebook-variable-labels.csv"),
+    "(", nrow(ds_var_combined), "rows )\n")
 
-# -- Variable labels -----------------------------------------------------------
-vcat("  Extracting variable labels...\n")
+# ---- extract-value-labels ----------------------------------------------------
+cat("\n---- SECTION: Extract value labels -----------------------------------\n")
+ds_val_2010 <- extract_val_labels(ds_2010, "CCHS_2010")
+ds_val_2014 <- extract_val_labels(ds_2014, "CCHS_2014")
 
-var_labels_2010 <- extract_variable_labels(ds_2010_meta, cycle_label = "2010-2011")
-var_labels_2014 <- extract_variable_labels(ds_2014_meta, cycle_label = "2013-2014")
+ds_val_combined <- dplyr::bind_rows(ds_val_2010, ds_val_2014)
 
-var_labels_all <- dplyr::bind_rows(var_labels_2010, var_labels_2014) %>%
-  dplyr::arrange(variable_name, cycle)
+readr::write_csv(
+  ds_val_combined,
+  file.path(output_dir, "codebook-value-labels.csv")
+)
+cat("  Written:", file.path(output_dir, "codebook-value-labels.csv"),
+    "(", nrow(ds_val_combined), "rows )\n")
 
-vcat(sprintf("  Variable label rows: %d (both cycles)\n", nrow(var_labels_all)))
+# ---- compare-cycles ----------------------------------------------------------
+cat("\n---- SECTION: Cross-cycle variable comparison ------------------------\n")
 
-# -- Value labels --------------------------------------------------------------
-vcat("  Extracting value labels...\n")
+vars_2010 <- unique(ds_var_2010$variable_name)
+vars_2014 <- unique(ds_var_2014$variable_name)
 
-val_labels_2010 <- extract_value_labels(ds_2010_meta, cycle_label = "2010-2011")
-val_labels_2014 <- extract_value_labels(ds_2014_meta, cycle_label = "2013-2014")
+# Variables present in 2010 only
+only_2010 <- setdiff(vars_2010, vars_2014)
+cat("  Variables in 2010 only:", length(only_2010), "\n")
 
-val_labels_all <- dplyr::bind_rows(val_labels_2010, val_labels_2014) %>%
-  dplyr::arrange(variable_name, cycle, value_code)
+# Variables present in 2014 only
+only_2014 <- setdiff(vars_2014, vars_2010)
+cat("  Variables in 2014 only:", length(only_2014), "\n")
 
-vcat(sprintf("  Value label rows: %d (both cycles)\n", nrow(val_labels_all)))
+# Variables present in both
+in_both <- intersect(vars_2010, vars_2014)
+cat("  Variables in both cycles:", length(in_both), "\n")
 
-# -- Cross-cycle diffs ---------------------------------------------------------
-vcat("  Computing cross-cycle value label differences...\n")
+ds_comparison <- tibble::tibble(
+  variable_name    = unique(c(vars_2010, vars_2014)),
+  in_cchs_2010     = variable_name %in% vars_2010,
+  in_cchs_2014     = variable_name %in% vars_2014,
+  label_2010       = ds_var_2010$variable_label[match(variable_name, ds_var_2010$variable_name)],
+  label_2014       = ds_var_2014$variable_label[match(variable_name, ds_var_2014$variable_name)],
+  labels_identical = dplyr::coalesce(label_2010, "") == dplyr::coalesce(label_2014, "")
+) %>%
+  dplyr::arrange(!in_cchs_2010 | !in_cchs_2014, variable_name)
 
-# Variables present in both cycles
-vars_in_both <- intersect(
-  val_labels_2010$variable_name,
-  val_labels_2014$variable_name
+readr::write_csv(
+  ds_comparison,
+  file.path(output_dir, "codebook-cycle-comparison.csv")
+)
+cat("  Written:", file.path(output_dir, "codebook-cycle-comparison.csv"),
+    "(", nrow(ds_comparison), "rows )\n")
+
+# ---- spot-check-research-vars ------------------------------------------------
+cat("\n---- SECTION: Research variable spot-check ---------------------------\n")
+# Verify key research variables appear in both cycles
+
+research_vars <- c(
+  # Outcome (LOP)
+  "LOP_015", "LOPG040", "LOPG070", "LOPG082", "LOPG083",
+  "LOPG084", "LOPG085", "LOPG086", "LOPG100",
+  # Chronic conditions (CCC)
+  "CCC_031", "CCC_041", "CCC_051", "CCC_061", "CCC_071",
+  "CCC_081", "CCC_091", "CCC_101", "CCC_121", "CCC_131",
+  "CCC_141", "CCC_151", "CCC_171", "CCC_251", "CCC_261",
+  "CCC_280", "CCC_290",
+  # Demographics
+  "DHHGAGE", "DHH_SEX", "DHHGMS", "DHHGHSZ", "DHHGLE5",
+  "DHHG611", "DHHGL12", "GEOGPRV",
+  # Socioeconomic
+  "INCGHH", "EDUDR04", "EDUDH04", "SDCFIMM", "SDCGRES", "SDCGCGT",
+  # Health behaviours
+  "HWTGISW", "HWTGBMI", "ALCDTTM", "FVCGTOT", "PACDPAI",
+  # General health
+  "GEN_01", "GEN_02", "GEN_02B", "GEN_09",
+  # Functional limitations
+  "ADL_01", "ADL_02", "ADL_03", "ADL_04", "ADL_05", "ADL_06",
+  # Survey design
+  "WTS_M", "ADM_PRX",
+  # Employment / schedule
+  "LBSDPFT"
 )
 
-# For each shared variable, compare value label sets between cycles
-val_2010_wide <- val_labels_2010 %>%
-  dplyr::filter(variable_name %in% vars_in_both) %>%
-  dplyr::rename(value_label_2010 = value_label)
+ds_spot_check <- tibble::tibble(
+  variable_name = research_vars,
+  in_cchs_2010  = variable_name %in% vars_2010,
+  in_cchs_2014  = variable_name %in% vars_2014,
+  status        = dplyr::case_when(
+    in_cchs_2010 & in_cchs_2014  ~ "BOTH",
+    in_cchs_2010 & !in_cchs_2014 ~ "2010 ONLY",
+    !in_cchs_2010 & in_cchs_2014 ~ "2014 ONLY",
+    TRUE                          ~ "MISSING FROM BOTH"
+  )
+)
 
-val_2014_wide <- val_labels_2014 %>%
-  dplyr::filter(variable_name %in% vars_in_both) %>%
-  dplyr::rename(value_label_2014 = value_label)
+cat(format(ds_spot_check), "\n")
 
-val_diffs <- dplyr::full_join(
-  val_2010_wide %>% dplyr::select(-cycle),
-  val_2014_wide %>% dplyr::select(-cycle),
-  by = c("variable_name", "value_code")
-) %>%
-  dplyr::filter(
-    is.na(value_label_2010) | is.na(value_label_2014) |
-    value_label_2010 != value_label_2014
-  ) %>%
-  dplyr::arrange(variable_name, value_code)
-
-n_diff_vars <- dplyr::n_distinct(val_diffs$variable_name)
-vcat(sprintf("  Variables with differing value labels across cycles: %d\n", n_diff_vars))
-if (n_diff_vars > 0L) {
-  vcat("  ⚠ Differing variables:\n")
-  for (v in unique(val_diffs$variable_name)) {
-    vcat(sprintf("    - %s\n", v))
-  }
+# Flag any missing
+missing_any <- dplyr::filter(ds_spot_check, status != "BOTH")
+if (nrow(missing_any) > 0) {
+  warning(
+    nrow(missing_any), " research variable(s) not present in both cycles:\n",
+    paste(missing_any$variable_name, missing_any$status, sep = " -> ", collapse = "\n")
+  )
+} else {
+  cat("\n  All ", nrow(ds_spot_check), " research variables confirmed in both cycles.\n")
 }
 
-# Variables only in one cycle
-vars_only_2010 <- setdiff(val_labels_2010$variable_name, val_labels_2014$variable_name)
-vars_only_2014 <- setdiff(val_labels_2014$variable_name, val_labels_2010$variable_name)
+readr::write_csv(
+  ds_spot_check,
+  file.path(output_dir, "codebook-research-vars-check.csv")
+)
+cat("  Written:", file.path(output_dir, "codebook-research-vars-check.csv"), "\n")
 
-if (length(vars_only_2010) > 0L) {
-  vcat(sprintf("  Variables with value labels only in 2010-2011 (%d): %s\n",
-    length(vars_only_2010), paste(head(vars_only_2010, 10), collapse = ", ")))
-}
-if (length(vars_only_2014) > 0L) {
-  vcat(sprintf("  Variables with value labels only in 2013-2014 (%d): %s\n",
-    length(vars_only_2014), paste(head(vars_only_2014, 10), collapse = ", ")))
-}
-
-# ==============================================================================
-# SECTION 3: WRITE OUTPUTS
-# ==============================================================================
-
-vcat("\n", strrep("=", 70), "\n")
-vcat("SECTION 3: Writing output files\n")
-vcat(strrep("=", 70), "\n")
-
-utils::write.csv(var_labels_all, path_out_variable_labels, row.names = FALSE)
-vcat(sprintf("  ✓ cchs_variable_labels.csv  (%d rows)\n", nrow(var_labels_all)))
-
-utils::write.csv(val_labels_all, path_out_value_labels, row.names = FALSE)
-vcat(sprintf("  ✓ cchs_value_labels.csv     (%d rows)\n", nrow(val_labels_all)))
-
-utils::write.csv(val_diffs, path_out_diffs, row.names = FALSE)
-vcat(sprintf("  ✓ cchs_value_label_diffs.csv (%d differing rows across %d variables)\n",
-             nrow(val_diffs), n_diff_vars))
-
-# ==============================================================================
-# SECTION 4: SUMMARY
-# ==============================================================================
-
-cat("\n")
-cat(strrep("=", 70), "\n")
-cat("Metadata extraction complete\n")
-cat(strrep("-", 70), "\n")
-cat(sprintf("  Variables documented (2010-2011): %d\n", ncol(ds_2010_meta)))
-cat(sprintf("  Variables documented (2013-2014): %d\n", ncol(ds_2014_meta)))
-cat(sprintf("  Value-labelled variables (2010-2011): %d\n",
-    sum(var_labels_2010$has_value_labels)))
-cat(sprintf("  Value-labelled variables (2013-2014): %d\n",
-    sum(var_labels_2014$has_value_labels)))
-cat(sprintf("  Variables with cross-cycle label diffs: %d\n", n_diff_vars))
-cat(sprintf("  Outputs written to: %s\n", output_dir))
-cat(strrep("=", 70), "\n")
-
-cat(sprintf("\nScript completed in %.1f seconds.\n",
-            as.numeric(difftime(Sys.time(), script_start, units = "secs"))))
-
-# ============================================================================
-# USAGE NOTE
-# ============================================================================
-# To look up the coding for any variable during Ellis development:
-#
-#   library(readr)
-#   vals <- read_csv("data-public/derived/cchs-metadata/cchs_value_labels.csv")
-#
-#   # Look up DHHGAGE in 2010 cycle:
-#   vals |> filter(variable_name == "DHHGAGE", cycle == "2010-2011")
-#
-#   # Check if codes differ between cycles:
-#   diffs <- read_csv("data-public/derived/cchs-metadata/cchs_value_label_diffs.csv")
-#   diffs |> filter(variable_name == "DHHGAGE")
-#
-#   # Search by variable label text:
-#   read_csv("data-public/derived/cchs-metadata/cchs_variable_labels.csv") |>
-#     filter(grepl("age", variable_label, ignore.case = TRUE))
-# ============================================================================
+cat("\n---- SECTION: Session info -------------------------------------------\n")
+sessionInfo()

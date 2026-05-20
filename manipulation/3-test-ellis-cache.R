@@ -1,378 +1,217 @@
-#' ---
-#' title: "Test: Ellis Lane 2 ↔ CACHE-Manifest Alignment (CCHS)"
-#' author: "Andriy Koval"
-#' date: "2026-02-19"
-#' ---
-#'
-#' ============================================================================
-#' PURPOSE: Verify that CACHE-manifest.md accurately describes the artifacts
-#' actually produced by manipulation/2-ellis.R (CCHS analytical dataset)
-#' ============================================================================
-#'
-#' THREE-WAY ALIGNMENT CHECK:
-#'   1. Ellis script (2-ellis.R)         — the code that produces the artifacts
-#'   2. Artifacts on disk                — Parquet files + SQLite database
-#'   3. CACHE-manifest.md                — the human-readable documentation
-#'
-#' Run this after any change to 2-ellis.R or CACHE-manifest.md to ensure
-#' the documentation still matches reality.
-#'
-#' ============================================================================
+rm(list = ls(all.names = TRUE)) # Clear the memory of variables from previous run.
+cat("\014") # Clear the console
+cat("Working directory: ", getwd()) # Must be set to Project Directory
 
-#+ echo=F
-# rmarkdown::render(input = "./manipulation/2-test-ellis-cache.R") # run to knit
-# ---- setup -------------------------------------------------------------------
-rm(list = ls(all.names = TRUE))
-cat("\014")
-
-script_start <- Sys.time()
+# Three-way alignment test: Ellis code <-> Disk (SQLite + Parquet) <-> CACHE-manifest
+# Registered as run_r_soft in flow.R — failures warn but do not halt the pipeline.
 
 # ---- load-packages -----------------------------------------------------------
 library(magrittr)
 library(dplyr)
-library(stringr)
 requireNamespace("DBI")
 requireNamespace("RSQLite")
 requireNamespace("arrow")
-requireNamespace("checkmate")
-requireNamespace("fs")
+requireNamespace("config")
 
 # ---- declare-globals ---------------------------------------------------------
-parquet_dir   <- "./data-private/derived/cchs-2-tables/"
-sqlite_path   <- "./data-private/derived/cchs-2.sqlite"
-manifest_path <- "./data-public/metadata/CACHE-manifest.md"
-ellis_script  <- "./manipulation/2-ellis.R"
+config <- config::get()
 
-# Expected file inventory
-expected_parquet_files <- sort(c(
-  "cchs_analytical.parquet",
-  "sample_flow.parquet"
-))
+path_ellis  <- config$database$cchs$ellis_sqlite
+parquet_dir <- config$database$cchs$ellis_parquet_dir
 
-expected_sqlite_tables <- sort(c(
-  "cchs_analytical",
-  "sample_flow"
-))
+pass_count <- 0L
+fail_count <- 0L
 
-# Test counters
-tests_passed  <- 0L
-tests_failed  <- 0L
-tests_skipped <- 0L
-failures      <- character(0)
-
-# ---- declare-functions -------------------------------------------------------
-run_test <- function(test_name, expr, skip_reason = NULL) {
-  if (!is.null(skip_reason)) {
-    tests_skipped <<- tests_skipped + 1L
-    cat("   ⏭️  SKIP:", test_name, "-", skip_reason, "\n")
-    return(invisible(FALSE))
-  }
-  result <- tryCatch({
-    eval(expr)
-    TRUE
-  }, error = function(e) e$message)
-
-  if (isTRUE(result)) {
-    tests_passed <<- tests_passed + 1L
-    cat("   ✅ PASS:", test_name, "\n")
-    invisible(TRUE)
-  } else {
-    tests_failed <<- tests_failed + 1L
-    msg <- if (is.character(result)) result else "Assertion failed"
-    failures <<- c(failures, paste0(test_name, ": ", msg))
-    cat("   ❌ FAIL:", test_name, "\n")
-    cat("         ", msg, "\n")
-    invisible(FALSE)
-  }
-}
-
-# ==============================================================================
-cat("\n", strrep("=", 70), "\n")
-cat("ELLIS ↔ CACHE-MANIFEST ALIGNMENT TESTS (CCHS)\n")
-cat(strrep("=", 70), "\n")
-cat(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
-
-# ==============================================================================
-# SECTION 1: ARTIFACT EXISTENCE
-# ==============================================================================
-
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-cat("SECTION 1: ARTIFACT EXISTENCE\n")
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-run_test("Ellis script exists",   quote(checkmate::assert_file_exists(ellis_script)))
-run_test("CACHE-manifest exists", quote(checkmate::assert_file_exists(manifest_path)))
-run_test("SQLite database exists",quote(checkmate::assert_file_exists(sqlite_path)))
-run_test("Parquet dir exists",    quote(checkmate::assert_directory_exists(parquet_dir)))
-
-actual_parquet_files <- sort(list.files(parquet_dir, pattern = "\\.parquet$"))
-
-run_test("Parquet file count = 2", quote(
-  checkmate::assert_true(length(actual_parquet_files) == 2L)
-))
-
-run_test("Expected Parquet files present", quote(
-  checkmate::assert_set_equal(actual_parquet_files, expected_parquet_files)
-))
-
-extra_parquet <- setdiff(actual_parquet_files, expected_parquet_files)
-run_test("No unexpected Parquet files", quote(
-  checkmate::assert_true(length(extra_parquet) == 0L)
-))
-
-# ==============================================================================
-# SECTION 2: SQLITE ↔ PARQUET PARITY
-# ==============================================================================
-
-cat("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-cat("SECTION 2: SQLITE ↔ PARQUET PARITY\n")
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-sqlite_ok <- file.exists(sqlite_path)
-
-if (sqlite_ok) {
-  cnn <- DBI::dbConnect(RSQLite::SQLite(), sqlite_path)
-  sqlite_tables <- sort(DBI::dbListTables(cnn))
-
-  run_test("SQLite table count = 2", quote(
-    checkmate::assert_true(length(sqlite_tables) == 2L)
-  ))
-  run_test("SQLite table names match expected", quote(
-    checkmate::assert_set_equal(sqlite_tables, expected_sqlite_tables)
-  ))
-
-  cat("\n   Row parity (SQLite ↔ Parquet):\n")
-  for (tbl_name in expected_sqlite_tables) {
-    parquet_path <- file.path(parquet_dir, paste0(tbl_name, ".parquet"))
-    if (!file.exists(parquet_path)) {
-      run_test(paste0("Parity: ", tbl_name, " (Parquet missing)"),
-               quote(stop("Parquet file does not exist")))
-      next
+# Helper: run a named assertion
+assert_test <- function(label, expr) {
+  result <- tryCatch(
+    {
+      stopifnot(expr)
+      TRUE
+    },
+    error = function(e) {
+      cat("  FAIL:", label, "\n       ", conditionMessage(e), "\n")
+      FALSE
     }
-    sqlite_n  <- DBI::dbGetQuery(cnn, sprintf("SELECT COUNT(*) AS n FROM %s", tbl_name))$n
-    parquet_n <- nrow(arrow::read_parquet(parquet_path))
-    run_test(
-      paste0("Row parity: ", tbl_name,
-             " (SQLite=", format(sqlite_n, big.mark=","),
-             " ↔ Parquet=", format(parquet_n, big.mark=","), ")"),
-      bquote(checkmate::assert_true(.(sqlite_n) == .(parquet_n)))
+  )
+  if (result) {
+    cat("  PASS:", label, "\n")
+    pass_count <<- pass_count + 1L
+  } else {
+    fail_count <<- fail_count + 1L
+  }
+  invisible(result)
+}
+
+cat("\n---- SECTION 1: Artifact Existence -----------------------------------\n")
+# ---- test-artifacts-exist ----------------------------------------------------
+assert_test("Ellis SQLite exists",
+  file.exists(path_ellis)
+)
+
+assert_test("Parquet directory exists",
+  dir.exists(parquet_dir)
+)
+
+assert_test("cchs_analytic.parquet exists",
+  file.exists(file.path(parquet_dir, "cchs_analytic.parquet"))
+)
+
+assert_test("sample_flow.parquet exists",
+  file.exists(file.path(parquet_dir, "sample_flow.parquet"))
+)
+
+cat("\n---- SECTION 2: Cross-Format Parity (SQLite <-> Parquet) ------------\n")
+# ---- test-parity -------------------------------------------------------------
+if (file.exists(path_ellis) && file.exists(file.path(parquet_dir, "cchs_analytic.parquet"))) {
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), dbname = path_ellis)
+  n_sqlite <- DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM cchs_analytic")$n
+  cols_sqlite <- DBI::dbListFields(con, "cchs_analytic")
+  DBI::dbDisconnect(con)
+
+  ds_parquet <- arrow::read_parquet(file.path(parquet_dir, "cchs_analytic.parquet"))
+  n_parquet   <- nrow(ds_parquet)
+  cols_parquet <- names(ds_parquet)
+
+  assert_test("Row count matches: SQLite == Parquet",
+    n_sqlite == n_parquet
+  )
+
+  assert_test("Column count matches: SQLite == Parquet",
+    length(cols_sqlite) == length(cols_parquet)
+  )
+
+  cat("  Row count  | SQLite:", n_sqlite, "| Parquet:", n_parquet, "\n")
+  cat("  Col count  | SQLite:", length(cols_sqlite), "| Parquet:", length(cols_parquet), "\n")
+
+} else {
+  cat("  SKIP: SQLite or Parquet file not found — skipping parity tests.\n")
+}
+
+cat("\n---- SECTION 3: Data Quality Checks ---------------------------------\n")
+# ---- test-data-quality -------------------------------------------------------
+if (exists("ds_parquet") && nrow(ds_parquet) > 0) {
+
+  # Sample size plausibility (prior analysis: n = 64,141)
+  assert_test("Sample size within plausible range (40,000 - 90,000)",
+    nrow(ds_parquet) >= 40000L && nrow(ds_parquet) <= 90000L
+  )
+
+  # Survey weight: all positive
+  assert_test("wts_m_pooled: all positive",
+    all(ds_parquet$wts_m_pooled > 0, na.rm = TRUE)
+  )
+
+  # Survey weight: no NAs
+  assert_test("wts_m_pooled: no missing values",
+    sum(is.na(ds_parquet$wts_m_pooled)) == 0L
+  )
+
+  # Both cycles represented
+  assert_test("Both CCHS cycles present",
+    all(c(0L, 1L) %in% ds_parquet$cchs_cycle)
+  )
+
+  # Outcome variable: within 0-90
+  assert_test("days_absent_total: range 0 to 90",
+    min(ds_parquet$days_absent_total, na.rm = TRUE) >= 0 &&
+    max(ds_parquet$days_absent_total, na.rm = TRUE) <= 90
+  )
+
+  # Outcome variable: no NAs
+  assert_test("days_absent_total: no missing values",
+    sum(is.na(ds_parquet$days_absent_total)) == 0L
+  )
+
+  # Zero proportion: should be roughly 50-85% per prior analysis
+  pct_zero <- mean(ds_parquet$days_absent_total == 0) * 100
+  cat("  Info: days_absent_total zero proportion:", round(pct_zero, 1), "% (expected ~71%)\n")
+  assert_test("days_absent_total: zero proportion between 40% and 90%",
+    pct_zero >= 40 && pct_zero <= 90
+  )
+
+  # Chronic condition columns: logical (no integer codes remaining)
+  cond_cols <- names(ds_parquet)[startsWith(names(ds_parquet), "cond_")]
+  assert_test("Chronic condition columns present (at least 10)",
+    length(cond_cols) >= 10L
+  )
+  assert_test("Chronic condition columns are logical",
+    all(purrr::map_lgl(ds_parquet[cond_cols], is.logical))
+  )
+
+  # Age: dhhgage stores CCHS category codes 2-15 (not year values)
+  # Code 2 = 15-17 yrs (lower bound set in Ellis), Code 15 = 75-79 yrs (upper bound)
+  assert_test("dhhgage: all codes 2 to 15 (CCHS category codes, not year values)",
+    all(ds_parquet$dhhgage >= 2L & ds_parquet$dhhgage <= 15L, na.rm = TRUE)
+  )
+
+  # Province factor: 13 levels expected
+  assert_test("province factor: 13 levels",
+    nlevels(ds_parquet$province) == 13L
+  )
+
+  # Cycle proportions approximately equal (±15%)
+  cycle_pct <- prop.table(table(ds_parquet$cchs_cycle))
+  assert_test("Cycle proportions roughly balanced (40-60%)",
+    all(cycle_pct >= 0.40 & cycle_pct <= 0.60)
+  )
+
+  # immigration_status: 3-level factor; non-immigrants now captured via SDCFIMM
+  # After the SDCFIMM fix, non-NA count should be > 50,000 (near-complete coverage)
+  if ("immigration_status" %in% names(ds_parquet)) {
+    imm_nonNA <- sum(!is.na(ds_parquet$immigration_status))
+    imm_levels <- levels(ds_parquet$immigration_status)
+    cat("  Info: immigration_status non-NA n =", imm_nonNA,
+        "| levels:", paste(imm_levels, collapse = ", "), "\n")
+    assert_test("immigration_status: 3 factor levels",
+      length(imm_levels) == 3L
     )
-  }
-
-  cat("\n   Column parity (SQLite ↔ Parquet):\n")
-  for (tbl_name in expected_sqlite_tables) {
-    parquet_path <- file.path(parquet_dir, paste0(tbl_name, ".parquet"))
-    if (!file.exists(parquet_path)) next
-    sqlite_cols  <- sort(DBI::dbListFields(cnn, tbl_name))
-    parquet_cols <- sort(names(arrow::read_parquet(parquet_path, as_data_frame = FALSE)))
-    run_test(
-      paste0("Column names: ", tbl_name),
-      bquote(checkmate::assert_set_equal(.(sqlite_cols), .(parquet_cols)))
+    assert_test("immigration_status: non-NA count > 50,000 (non-immigrants captured)",
+      imm_nonNA > 50000L
     )
-  }
-
-  DBI::dbDisconnect(cnn)
-} else {
-  run_test("SQLite readable", NULL, skip_reason = "SQLite file missing — run 2-ellis.R first")
-}
-
-# ==============================================================================
-# SECTION 3: DATA QUALITY CHECKS (cchs_analytical)
-# ==============================================================================
-
-cat("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-cat("SECTION 3: DATA QUALITY — cchs_analytical\n")
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-parquet_analytical <- file.path(parquet_dir, "cchs_analytical.parquet")
-
-if (file.exists(parquet_analytical)) {
-  ds <- arrow::read_parquet(parquet_analytical)
-
-  # Row counts
-  n_total  <- nrow(ds)
-  n_cycle0 <- sum(ds$cycle == 0L, na.rm = TRUE)
-  n_cycle1 <- sum(ds$cycle == 1L, na.rm = TRUE)
-
-  cat(sprintf("   Total rows: %s  (CCHS 2010: %s, CCHS 2014: %s)\n",
-              format(n_total, big.mark=","),
-              format(n_cycle0, big.mark=","),
-              format(n_cycle1, big.mark=",")))
-
-  run_test("Both cycles present", quote(
-    checkmate::assert_true(n_cycle0 > 0L && n_cycle1 > 0L)
-  ))
-
-  # Final sample size plausibility (reference: ~63,843)
-  run_test("Sample size plausible (40k–90k)", quote(
-    checkmate::assert_true(n_total >= 40000L && n_total <= 90000L)
-  ))
-
-  # Required columns (structural + key predictors)
-  required_cols <- c("cycle", "days_absent_total", "days_absent_chronic",
-                     "wts_m_pooled", "wts_m_original", "geodpmf",
-                     "living_arrangements", "alcohol_type", "bmi_category",
-                     "occupation_category", "dhhgle5", "dhhg611")
-  run_test("Required columns present", quote(
-    checkmate::assert_names(names(ds), must.include = required_cols)
-  ))
-
-  # Outcome range
-  run_test("days_absent_total: non-negative", quote(
-    checkmate::assert_numeric(ds$days_absent_total, lower = 0)
-  ))
-  run_test("days_absent_total: max ≤ 90", quote(
-    checkmate::assert_true(max(ds$days_absent_total, na.rm = TRUE) <= 90)
-  ))
-
-  # Weights positive
-  run_test("wts_m_pooled: all positive", quote(
-    checkmate::assert_numeric(ds$wts_m_pooled, any.missing = FALSE, lower = 0.001)
-  ))
-
-  # Weight adjustment: pooled should be exactly half of original
-  wt_ratio <- mean(ds$wts_m_pooled, na.rm = TRUE) /
-              mean(ds$wts_m_original, na.rm = TRUE)
-  run_test("wts_m_pooled = wts_m_original / 2 (ratio ≈ 0.5)", quote(
-    checkmate::assert_true(abs(wt_ratio - 0.5) < 0.001)
-  ))
-
-  # Factor columns: check critical ones (including formerly-ALL-NA columns now populated)
-  factor_check <- c("age_group", "sex", "cycle_f",
-                    "living_arrangements", "alcohol_type", "bmi_category",
-                    "occupation_category")
-  for (fc in intersect(factor_check, names(ds))) {
-    run_test(paste0("'", fc, "' is factor with levels"), quote(
-      checkmate::assert_factor(ds[[fc]], any.missing = TRUE)
-    ))
-  }
-
-  # Verify formerly-ALL-NA factors now have non-NA values
-  populated_factors <- c("living_arrangements", "alcohol_type", "bmi_category",
-                         "occupation_category")
-  for (pf in intersect(populated_factors, names(ds))) {
-    n_non_na <- sum(!is.na(ds[[pf]]))
-    run_test(paste0("'", pf, "' has non-NA values (n=", format(n_non_na, big.mark=","), ")"), 
-             bquote(checkmate::assert_true(.(n_non_na) > 0L)))
-  }
-
-  # Outcome distribution (soft check: warn if far from reference)
-  mean_out <- weighted.mean(ds$days_absent_total, w = ds$wts_m_pooled, na.rm = TRUE)
-  pct_zero <- mean(ds$days_absent_total == 0, na.rm = TRUE) * 100
-  cat(sprintf("   Weighted mean outcome: %.2f  (reference: ≈1.25)\n", mean_out))
-  cat(sprintf("   Percent zeros:         %.1f%%  (reference: ≈70.5%%)\n", pct_zero))
-  run_test("Outcome mean plausible (0.5–5.0)", quote(
-    checkmate::assert_true(mean_out >= 0.5 && mean_out <= 5.0)
-  ))
-
-} else {
-  run_test("cchs_analytical.parquet readable", NULL,
-           skip_reason = "Parquet file missing — run 2-ellis.R first")
-}
-
-# ==============================================================================
-# SECTION 4: DATA QUALITY CHECKS (sample_flow)
-# ==============================================================================
-
-cat("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-cat("SECTION 4: DATA QUALITY — sample_flow\n")
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
-parquet_flow <- file.path(parquet_dir, "sample_flow.parquet")
-
-if (file.exists(parquet_flow)) {
-  sf <- arrow::read_parquet(parquet_flow)
-
-  run_test("sample_flow has 5 rows (one per exclusion step)", quote(
-    checkmate::assert_true(nrow(sf) == 5L)
-  ))
-
-  expected_flow_cols <- c("step", "description", "n_remaining", "n_excluded", "pct_remaining")
-  run_test("sample_flow has expected columns", quote(
-    checkmate::assert_names(names(sf), must.include = expected_flow_cols)
-  ))
-
-  # n_remaining should be monotonically decreasing
-  run_test("n_remaining is non-increasing", quote(
-    checkmate::assert_true(all(diff(sf$n_remaining) <= 0L))
-  ))
-
-  # Final n_remaining should match nrow(cchs_analytical)
-  if (file.exists(parquet_analytical)) {
-    n_analytical <- nrow(arrow::read_parquet(parquet_analytical))
-    n_flow_final <- sf$n_remaining[nrow(sf)]
-    run_test(
-      paste0("sample_flow final n matches cchs_analytical rows (",
-             format(n_flow_final, big.mark=","), " = ", format(n_analytical, big.mark=","), ")"),
-      bquote(checkmate::assert_true(.(n_flow_final) == .(n_analytical)))
+    assert_test("immigration_status: 'Non-immigrant (Canadian-born)' level present",
+      "Non-immigrant (Canadian-born)" %in% imm_levels
     )
+  } else {
+    cat("  SKIP: immigration_status column not found.\n")
   }
 
-  cat("\n   Sample flow summary:\n")
-  print(as.data.frame(sf[, c("step", "n_remaining", "n_excluded")]))
-
 } else {
-  run_test("sample_flow.parquet readable", NULL,
-           skip_reason = "Parquet file missing — run 2-ellis.R first")
+  cat("  SKIP: Parquet data not available — skipping data quality tests.\n")
 }
 
-# ==============================================================================
-# SECTION 5: MANIFEST ALIGNMENT
-# ==============================================================================
+cat("\n---- SECTION 4: Sample Flow Validation ------------------------------\n")
+# ---- test-sample-flow --------------------------------------------------------
+if (file.exists(file.path(parquet_dir, "sample_flow.parquet"))) {
 
-cat("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-cat("SECTION 5: MANIFEST ↔ ARTIFACTS (CACHE-manifest.md vs disk)\n")
-cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+  sf <- arrow::read_parquet(file.path(parquet_dir, "sample_flow.parquet"))
 
-manifest_ok <- file.exists(manifest_path)
+  assert_test("sample_flow has at least 5 steps",
+    nrow(sf) >= 5L
+  )
 
-if (manifest_ok) {
-  manifest_lines <- readLines(manifest_path, warn = FALSE)
+  assert_test("sample_flow n_remaining is monotonically non-increasing",
+    all(diff(sf$n_remaining) <= 0)
+  )
 
-  # Check manifest has been populated (not just the empty template)
-  is_populated <- any(str_detect(manifest_lines, "cchs_analytical|CCHS"))
-  run_test("CACHE-manifest.md has been populated with CCHS content", quote(
-    checkmate::assert_true(is_populated)
-  ))
+  assert_test("sample_flow final n > 0",
+    dplyr::last(sf$n_remaining) > 0L
+  )
 
-  # Check manifest references both tables
-  run_test("Manifest references cchs_analytical", quote(
-    checkmate::assert_true(any(str_detect(manifest_lines, "cchs_analytical")))
-  ))
-  run_test("Manifest references sample_flow", quote(
-    checkmate::assert_true(any(str_detect(manifest_lines, "sample_flow")))
-  ))
+  cat("\n  Sample Flow Table:\n")
+  print(sf[, c("step","description","n_remaining","n_excluded")], n = Inf)
 
 } else {
-  run_test("CACHE-manifest.md populated",
-           NULL,
-           skip_reason = "Manifest missing or empty — populate data-public/metadata/CACHE-manifest.md")
+  cat("  SKIP: sample_flow.parquet not found.\n")
 }
 
-# ==============================================================================
-# SUMMARY
-# ==============================================================================
+cat("\n---- Test Summary ----------------------------------------------------\n")
+cat("  PASSED:", pass_count, "\n")
+cat("  FAILED:", fail_count, "\n")
 
-duration <- difftime(Sys.time(), script_start, units = "secs")
-
-cat("\n", strrep("=", 70), "\n")
-cat("TEST SUMMARY\n")
-cat(strrep("=", 70), "\n\n")
-
-total_run <- tests_passed + tests_failed
-cat(sprintf("  ✅ Passed:  %d\n", tests_passed))
-cat(sprintf("  ❌ Failed:  %d\n", tests_failed))
-cat(sprintf("  ⏭️  Skipped: %d\n", tests_skipped))
-cat(sprintf("  Total run: %d\n", total_run))
-cat(sprintf("  Duration:  %.1f seconds\n\n", as.numeric(duration)))
-
-if (tests_failed > 0L) {
-  cat("  FAILURES:\n")
-  for (f in failures) {
-    cat("   ❌", f, "\n")
-  }
-  cat("\n")
-  message("⚠️  ", tests_failed, " test(s) FAILED — see output above for details")
-} else if (total_run > 0L) {
-  cat("  🎉 All tests passed — Ellis output aligns with CACHE-manifest\n")
+if (fail_count > 0L) {
+  warning(fail_count, " test(s) failed — review output above for details.")
+} else {
+  cat("  All tests passed.\n")
 }

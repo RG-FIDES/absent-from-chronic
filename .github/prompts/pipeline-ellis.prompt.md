@@ -31,7 +31,7 @@ Develop or refine the Ellis transformation script. This is Phase 2 of the Pipeli
 2. Read `config.yml` for database paths
 3. Read existing `manipulation/2-ellis.R` if it exists
 4. Read `data-public/metadata/INPUT-manifest.md` for variable inventory
-5. Read codebook CSVs in `data-public/derived/` for value label mappings
+5. Read codebook CSVs in `data-private/derived/` for value label mappings
 6. Read `scripts/templates/ellis-lane.R` and `scripts/templates/ellis.R` for templates
 
 ### Step 2: Interview
