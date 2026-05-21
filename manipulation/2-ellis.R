@@ -516,23 +516,23 @@ ds_analytic <- ds_analytic %>%
     ~dplyr::case_when(. == 1 ~ TRUE, . == 2 ~ FALSE, TRUE ~ NA)
   )) %>%
   dplyr::rename(
-    cond_asthma           = ccc_031,
-    cond_fibromyalgia     = ccc_041,
-    cond_arthritis        = ccc_051,
-    cond_back_problems    = ccc_061,
-    cond_hypertension     = ccc_071,
-    cond_migraine         = ccc_081,
-    cond_copd             = ccc_091,
-    cond_diabetes         = ccc_101,
-    cond_heart_disease    = ccc_121,
-    cond_cancer           = ccc_131,
-    cond_ulcer            = ccc_141,
-    cond_stroke           = ccc_151,
-    cond_bowel_disorder   = ccc_171,
-    cond_fatigue_syndrome = ccc_251,
-    cond_chem_sensitivity = ccc_261,
-    cond_mood_disorder    = ccc_280,
-    cond_anxiety          = ccc_290
+    cc_asthma            = ccc_031,
+    cc_fibromyalgia      = ccc_041,
+    cc_arthritis         = ccc_051,
+    cc_back_problems     = ccc_061,
+    cc_hypertension      = ccc_071,
+    cc_migraine          = ccc_081,
+    cc_copd              = ccc_091,
+    cc_diabetes          = ccc_101,
+    cc_heart_disease     = ccc_121,
+    cc_cancer            = ccc_131,
+    cc_ulcer             = ccc_141,
+    cc_stroke            = ccc_151,
+    cc_bowel_disorder    = ccc_171,
+    cc_fatigue_syndrome  = ccc_251,
+    cc_chem_sensitivity  = ccc_261,
+    cc_mood_disorder     = ccc_280,
+    cc_anxiety           = ccc_290
   )
 
 # ---- recode-health-behaviours ------------------------------------------------
@@ -885,7 +885,7 @@ ds_out <- ds_analytic %>%
     # Raw LOP components (keep for sensitivity checks)
     dplyr::all_of(lop_day_vars),
     # Chronic condition flags (renamed logical)
-    dplyr::starts_with("cond_"),
+    dplyr::starts_with("cc_"),
     # Demographics (recoded)
     age_group_3, dhhgage, sex, marital_status, household_size,
     dplyr::any_of(c("dhhgle5","dhhg611","dhhgl12")),

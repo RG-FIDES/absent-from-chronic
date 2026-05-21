@@ -95,33 +95,33 @@ days_absent_total = lopg040 + lopg070 + lopg082 + lopg083 +
 ## Chronic Condition Indicators
 
 All chronic condition columns are logical type (`TRUE` / `FALSE` / `NA`). NAs are present:
-`cond_copd` was administered to a sub-sample only (~70% coverage), so ~21,779 rows
-have at least one `NA` among the 17 `cond_*` columns. Use `flag_complete_ccc` to
+`cc_copd` was administered to a sub-sample only (~70% coverage), so ~21,779 rows
+have at least one `NA` among the 17 `cc_*` columns. Use `flag_complete_ccc` to
 subset the 42,064 rows where all 17 indicators are non-NA.
 
 | Column | CCC source | Condition |
 |--------|-----------|-----------|
-| `cond_asthma` | `CCC_031` | Asthma |
-| `cond_fibromyalgia` | `CCC_041` | Fibromyalgia |
-| `cond_arthritis` | `CCC_051` | Arthritis |
-| `cond_back_problems` | `CCC_061` | Back problems (excl. fibromyalgia / arthritis) |
-| `cond_hypertension` | `CCC_071` | High blood pressure |
-| `cond_migraine` | `CCC_081` | Migraine |
-| `cond_copd` | `CCC_091` | COPD |
-| `cond_diabetes` | `CCC_101` | Diabetes |
-| `cond_heart_disease` | `CCC_121` | Heart disease |
-| `cond_cancer` | `CCC_131` | Cancer |
-| `cond_ulcer` | `CCC_141` | Stomach / intestinal ulcer |
-| `cond_stroke` | `CCC_151` | Stroke effects |
-| `cond_bowel_disorder` | `CCC_171` | Bowel disorder (Crohn's / colitis) |
-| `cond_fatigue_syndrome` | `CCC_251` | Chronic fatigue syndrome |
-| `cond_chem_sensitivity` | `CCC_261` | Multiple chemical sensitivities |
-| `cond_mood_disorder` | `CCC_280` | Mood disorder |
-| `cond_anxiety` | `CCC_290` | Anxiety disorder |
+| `cc_asthma` | `CCC_031` | Asthma |
+| `cc_fibromyalgia` | `CCC_041` | Fibromyalgia |
+| `cc_arthritis` | `CCC_051` | Arthritis |
+| `cc_back_problems` | `CCC_061` | Back problems (excl. fibromyalgia / arthritis) |
+| `cc_hypertension` | `CCC_071` | High blood pressure |
+| `cc_migraine` | `CCC_081` | Migraine |
+| `cc_copd` | `CCC_091` | COPD |
+| `cc_diabetes` | `CCC_101` | Diabetes |
+| `cc_heart_disease` | `CCC_121` | Heart disease |
+| `cc_cancer` | `CCC_131` | Cancer |
+| `cc_ulcer` | `CCC_141` | Stomach / intestinal ulcer |
+| `cc_stroke` | `CCC_151` | Stroke effects |
+| `cc_bowel_disorder` | `CCC_171` | Bowel disorder (Crohn's / colitis) |
+| `cc_fatigue_syndrome` | `CCC_251` | Chronic fatigue syndrome |
+| `cc_chem_sensitivity` | `CCC_261` | Multiple chemical sensitivities |
+| `cc_mood_disorder` | `CCC_280` | Mood disorder |
+| `cc_anxiety` | `CCC_290` | Anxiety disorder |
 
 > **Note on 19th condition**: The research instrument refers to 19 chronic
 > conditions. The mapping above yields 17 from clearly identified CCC variables.
-> Heart disease (`cond_heart_disease`) and stroke (`cond_stroke`) may constitute
+> Heart disease (`cc_heart_disease`) and stroke (`cc_stroke`) may constitute
 > the "cardiovascular disease/stroke" category counted as two or one.
 > Verify against Appendix 3 of the thesis before finalizing analytic models.
 
@@ -224,7 +224,7 @@ subset the 42,064 rows where all 17 indicators are non-NA.
   (codes 2+3), Former (codes 4+5), Never smoked.
 - `occupation_category` uses 2010 descriptive labels for both cycles; 2014 PUMF
   labels the same 5 groups only as "GROUP 1"–"GROUP 5".
-- The 17 `cond_*` columns are logical. Use `as.integer(cond_*)` to get 0/1 for
+- The 17 `cc_*` columns are logical. Use `as.integer(cc_*)` to get 0/1 for
   regression models.
 - Always use `wts_m_pooled` (not `wts_m`) for weighted analyses.
 - No bootstrap weights are available; report confidence intervals from survey

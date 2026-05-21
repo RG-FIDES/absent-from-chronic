@@ -132,12 +132,12 @@ if (exists("ds_parquet") && nrow(ds_parquet) > 0) {
   )
 
   # Chronic condition columns: logical (no integer codes remaining)
-  cond_cols <- names(ds_parquet)[startsWith(names(ds_parquet), "cond_")]
+  cc_cols <- names(ds_parquet)[startsWith(names(ds_parquet), "cc_")]
   assert_test("Chronic condition columns present (at least 10)",
-    length(cond_cols) >= 10L
+    length(cc_cols) >= 10L
   )
   assert_test("Chronic condition columns are logical",
-    all(purrr::map_lgl(ds_parquet[cond_cols], is.logical))
+    all(purrr::map_lgl(ds_parquet[cc_cols], is.logical))
   )
 
   # Age: dhhgage stores CCHS category codes 2-15 (not year values)
