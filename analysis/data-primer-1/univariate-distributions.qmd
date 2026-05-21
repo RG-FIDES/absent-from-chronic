@@ -1,0 +1,385 @@
+---
+title: "CCHS Analytic Dataset: Univariate Distributions"
+subtitle: "Data Primer 1 \u2014 Complete Variable Reference by Section"
+author: "Analysis Team"
+date: today
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    toc-depth: 3
+    code-fold: true
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: false
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options:
+  chunk_output_type: console
+---
+
+# Mission
+
+This document provides a complete univariate profile of every variable in the `cchs_analytic` analysis-ready table produced by `manipulation/2-ellis.R`. It serves as the **canonical data reference** for all EDAs and Reports in this project.
+
+**Dataset:** CCHS 2010 + 2014 pooled analytic sample\
+**Rows:** 63,843 respondents **Cols:** 69 variables\
+**Source:** `data-private/derived/cchs-2-tables/cchs_analytic.parquet`\
+**Pipeline documentation:** `data-public/metadata/CACHE-manifest.md`\
+**Variable traceability:** [Variable Inclusion](variable-inclusion.html)
+
+All computation lives in `univariate-distributions.R` (the laboratory). This document sources those chunks and presents output only. All chunk bodies are intentionally empty.
+
+------------------------------------------------------------------------
+
+```{r}
+#| label: knitr-setup
+#| code-summary: Reconciles working directory between execution modes
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = "../../") # keep isolated from surrounding chunks
+```
+
+```{r}
+#| label: set-options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+opts_chunk$set(
+  results  = "show",
+  message  = FALSE,
+  warning  = FALSE,
+  comment  = NA,
+  tidy     = FALSE
+)
+options(width = 110)
+# display-* chunks: hide code and pass output as raw HTML/markdown to pandoc
+knitr::opts_hooks$set(label = function(options) {
+  if (isTRUE(grepl("^display-", options$label))) {
+    options$echo    <- FALSE
+    options$results <- "asis"
+  }
+  options
+})
+read_chunk("analysis/data-primer-1/univariate-distributions.R")
+```
+
+# Environment
+
+```{r load-packages}
+```
+
+```{r load-sources}
+```
+
+```{r declare-globals}
+```
+
+```{r declare-functions}
+```
+
+# Data
+
+```{r load-data}
+```
+
+------------------------------------------------------------------------
+
+## Data Context
+
+```{r}
+#| label: data-context-overview
+#| echo: false
+#| message: false
+# Overview table: rows, cols, completeness flags
+d_local <- readRDS("analysis/data-primer-1/data-local/univariate-distributions.rds")
+cat(sprintf(
+  "Parquet table: cchs_analytic\nRows: 63,843  |  Columns: 69\nCycles: CCHS 2010 + CCHS 2014 (pooled)\nSource: data-private/derived/cchs-2-tables/cchs_analytic.parquet\n"
+))
+knitr::kable(
+  d_local$t_cycle_freq,
+  col.names = c("CCHS cycle", "N", "% (of valid)"),
+  caption   = "Sample size by survey cycle"
+)
+```
+
+```{r}
+#| label: data-context-completeness
+#| echo: false
+#| message: false
+if (nrow(d_local$t_flags_summary) > 0) {
+  knitr::kable(
+    d_local$t_flags_summary,
+    col.names = c("Completeness flag", "N TRUE", "N FALSE", "N missing"),
+    caption   = "Analytic completeness flags"
+  )
+}
+```
+
+------------------------------------------------------------------------
+
+# 1. Outcomes
+
+## 1.1 Primary and Sensitivity Outcomes
+
+`days_absent_total` is the primary outcome: total workdays absent due to any health reason in the past 2 weeks (LOP module). `days_absent_chronic` counts only absences attributable to chronic conditions.
+
+```{r section-outcomes}
+```
+
+```{r display-outcomes}
+```
+
+## 1.2 LOP Component Variables
+
+The eight raw LOP components contributing to `days_absent_total`. Each measures days absent for a specific health reason. High missingness is structural: the LOP module is administered only to currently employed respondents who reported any absence.
+
+```{r display-lop}
+```
+
+------------------------------------------------------------------------
+
+# 2. Chronic Conditions (Primary Exposure)
+
+Seventeen of the 19 requested chronic conditions are available in the PUMF. Two are suppressed for confidentiality (`ccc_300` — other mental illness; `ccc_185` — digestive disease) and are absent from this dataset. All `cc_*` columns are **logical** (TRUE/FALSE); prevalence percentages exclude missing values.
+
+```{r section-chronic-conditions}
+```
+
+```{r display-chronic-conditions}
+```
+
+> **Note:** Two conditions from §2.2 are absent from the PUMF and not shown: *other mental illness* (`ccc_300`) and *digestive disease* (`ccc_185`). Both require RDC access.
+
+------------------------------------------------------------------------
+
+# 3. Predisposing Variables
+
+Predisposing variables characterise the respondent's socio-demographic background. Student status (`sdcdgstud`) is suppressed in the PUMF and renders as all-NA. `dhhdfc12p` (children ≥ 12 yrs) has no PUMF equivalent and is absent. See [Variable Inclusion](variable-inclusion.html) §4 for full traceability.
+
+```{r section-predisposing}
+```
+
+::: panel-tabset
+### Age Group
+
+```{r display-age-group}
+```
+
+### Sex
+
+```{r display-sex}
+```
+
+### Marital Status
+
+```{r display-marital-status}
+```
+
+### Household Size
+
+```{r display-household-size}
+```
+
+### Education
+
+```{r display-education}
+```
+
+### Immigration Status
+
+```{r display-immigration-status}
+```
+
+### Visible Minority
+
+```{r display-visible-minority}
+```
+
+### Living Arrangements
+
+```{r display-living-arrangements}
+```
+
+### Student Status
+
+```{r display-student-status}
+```
+
+### Raw Age Code
+
+```{r display-dhhgage}
+```
+
+### Children in Household
+
+```{r display-children}
+```
+:::
+
+> **Note on missing household variables:** `dhhdfc12p` (children ≥ 12 yrs) has no PUMF equivalent. See [Variable Inclusion](variable-inclusion.html) §4.
+
+------------------------------------------------------------------------
+
+# 4. Facilitating Variables
+
+Facilitating variables describe health-system access, health behaviours, and labour-market context. All 12 facilitating variables are populated in the current pipeline output. See [Variable Inclusion](variable-inclusion.html) §5 for traceability.
+
+```{r section-facilitating}
+```
+
+::: panel-tabset
+### Income
+
+```{r display-income}
+```
+
+### Family Doctor
+
+```{r display-family-doctor}
+```
+
+### Employment Type
+
+```{r display-employment-type}
+```
+
+### Work Schedule
+
+```{r display-work-schedule}
+```
+
+### Smoking Status
+
+```{r display-smoking}
+```
+
+### BMI Category
+
+```{r display-bmi-category}
+```
+
+### Physical Activity
+
+```{r display-physical-activity}
+```
+
+### Alcohol Use
+
+```{r display-alcohol}
+```
+
+### Fruit & Veg
+
+```{r display-fruit-veg}
+```
+
+### Occupation Category
+
+```{r display-occupation-category}
+```
+
+### Work Stress
+
+```{r display-work-stress}
+```
+
+### Province
+
+```{r display-province}
+```
+:::
+
+------------------------------------------------------------------------
+
+# 5. Needs Variables
+
+Needs variables capture perceived health status and functional limitations. ADL items use semantic names after Ellis renaming (`adl_01` → `adl_meals`, etc.). All ADL items are binary Yes/No factors.
+
+```{r section-needs}
+```
+
+::: panel-tabset
+### General Health
+
+```{r display-health-perceived}
+```
+
+### Mental Health
+
+```{r display-mental-health}
+```
+
+### Health vs. Prior Year
+
+```{r display-health-vs-prior-year}
+```
+
+### Injured Past 12 Months
+
+```{r display-injury}
+```
+
+### ADL Items
+
+```{r display-adl}
+```
+:::
+
+------------------------------------------------------------------------
+
+# 6. Survey Design Variables
+
+```{r section-survey-design}
+```
+
+## 6.1 Sampling Weights
+
+`wts_m` is the per-cycle survey weight; `wts_m_pooled` is the pooled weight adjusted for two-cycle pooling (divide by 2 per Statistics Canada guidelines).
+
+```{r display-weights}
+```
+
+## 6.2 Survey Cycle
+
+```{r display-cycle}
+```
+
+## 6.3 Completeness Flags
+
+Three logical flags indicate whether a respondent has complete data for each analytical dimension. Use `flag_analytic_complete` to subset to the analytic sample.
+
+```{r display-flags}
+```
+
+**`flag_complete_ccc`** — All 17 chronic condition indicators (`cc_*`) are non-`NA`. `cc_copd` was administered to a sub-sample only (\~66% coverage), so this flag is `TRUE` for 42,064 of the 63,843 analytic rows. Use this flag when running models that include any `cc_*` predictor.
+
+**`flag_complete_predictors`** — All key predictor variables (age, sex, education, income, immigration status, province, employment, smoking, BMI, physical activity, perceived health, etc.) are non-`NA`. Rows with missing values on any single predictor will have this flag set to `FALSE`. Covers 59,309 rows.
+
+**`flag_analytic_complete`** — Both `flag_complete_ccc` AND `flag_complete_predictors` are `TRUE`. This is the recommended subsetting criterion for fully complete-case analyses. Covers 39,702 rows (\~62% of the analytic sample).
+
+> All three flags are pre-computed in the Ellis script. No need to re-derive exclusion logic in downstream analyses — simply filter on the relevant flag.
+
+------------------------------------------------------------------------
+
+```{r}
+#| label: session-info
+#| echo: false
+#| results: hide
+report_render_stop_time <- Sys.time()
+cat(
+  "Report rendered at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+  "\nElapsed:", round(difftime(report_render_stop_time, report_render_start_time, units = "secs"), 1),
+  "seconds\n"
+)
+sessionInfo()
+```
