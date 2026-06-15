@@ -1,6 +1,6 @@
 #  Absent from Chronic
 
-Replication of statistical analysis
+[Preview of Results](https://absent-from-chronic-site.vercel.app/edited_content/index.html)
 
 ## About This Project
 
