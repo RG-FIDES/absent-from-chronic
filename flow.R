@@ -136,10 +136,15 @@ ds_rail  <- tibble::tribble(
   ~fx         , ~path,
 
   # ---- CCHS Absenteeism Pipeline -------------------------------------------
-  "run_r_soft", "manipulation/0-extract-metadata.R",    # Lane 0: extract SPSS codebook CSVs
-  "run_r"     , "manipulation/1-ferry.R",               # Lane 1: transport .sav → cchs-1.sqlite
-  "run_r"     , "manipulation/2-ellis.R",               # Lane 2: recode, validate → cchs-2.sqlite
-  "run_r_soft", "manipulation/3-test-ellis-cache.R",    # Lane 3: three-way alignment test
+  # "run_r_soft", "manipulation/0-extract-metadata.R",    # Lane 0: extract SPSS codebook CSVs
+  # "run_r"     , "manipulation/1-ferry.R",               # Lane 1: transport .sav → cchs-1.sqlite
+  # "run_r"     , "manipulation/2-ellis.R",               # Lane 2: recode, validate → cchs-2.sqlite
+  # "run_r_soft", "manipulation/3-test-ellis-cache.R",    # Lane 3: three-way alignment test
+
+  # ---- Data Primer (uncomment when ready to render) ------------------------
+  # "run_r_soft", "analysis/data-primer-1/univariate-distributions.R",   # data primer: compute distributions (composed, not yet active)
+  "run_qmd",    "analysis/data-primer-1/univariate-distributions.qmd",  # data primer: univariate distributions (composed, not yet active)
+  "run_qmd",    "analysis/data-primer-1/variable-inclusion.qmd",        # data primer: variable traceability (composed, not yet active)
 
   # ---- Analysis (uncomment as EDAs are developed) --------------------------
   # Core analysis scripts that depend on the manipulated data
@@ -156,7 +161,24 @@ ds_rail  <- tibble::tribble(
   
   # "run_r_soft"  , "analysis/eda-1/eda-1.R",
   # "run_qmd_soft", "analysis/eda-1/eda-1.qmd",
-  
+
+  # "run_r"     , "analysis/eda-5/eda-5.R",          # EDA-5: LOP component decomposition §4.1 + §4.2 (composed, not yet active)
+
+  # ---- EDA-7: Gender Differences in Illness-Related Absence -----------------
+  # "run_r"     , "analysis/eda-7/eda-7.R",        # EDA-7: Gender × chronic condition × days absent (composed, not yet active)
+  # "run_qmd"   , "analysis/eda-7/eda-7.qmd",      # EDA-7: Gender absence report (1990s Excel aesthetics)
+
+  # ---- Series 6: Andersen Model Variable Profiles ----------------------------
+  # "run_r"     , "analysis/eda-61/eda-61.R",        # EDA-61: Exposure — 17 chronic condition flags (composed, not yet active)
+  "run_qmd"   , "analysis/eda-61/eda-61.qmd",      # EDA-61: Exposure report
+  # "run_r"     , "analysis/eda-62/eda-62.R",        # EDA-62: Predisposing — socio-demographics (composed, not yet active)
+  # "run_qmd"   , "analysis/eda-62/eda-62.qmd",      # EDA-62: Predisposing report
+  # "run_r"     , "analysis/eda-63/eda-63.R",        # EDA-63: Facilitating — access & behaviours (composed, not yet active)
+  # "run_qmd"   , "analysis/eda-63/eda-63.qmd",      # EDA-63: Facilitating report
+  # "run_r"     , "analysis/eda-64/eda-64.R",        # EDA-64: Needs — health status & ADL (composed, not yet active)
+  # "run_qmd"   , "analysis/eda-64/eda-64.qmd",      # EDA-64: Needs report
+  "run_qmd"   , "analysis/eda-5/eda-5.qmd",        # EDA-5: LOP component decomposition §4.1 + §4.2 (composed, not yet active)
+
 
 )
 
