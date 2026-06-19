@@ -210,6 +210,35 @@ For complete data documentation, see the
 #| fig-cap: "Condition prevalence comparison between 2010-2011 and 2013-2014 cycles"
 ```
 
+## Graph Family G1a: COPD Age-Gated Prevalence
+
+> **Context (Marc-André, 2026-05-15)**: The COPD question (CCC_091) was administered
+> only to respondents aged 35+. Younger respondents show `NA` because the question was
+> skipped — this is a survey design feature, not data quality failure. The graphs below
+> show COPD prevalence with age-gating applied (imputing `FALSE` for respondents below
+> the threshold) and compare the 17-condition profile within the eligible subsample.
+
+```{r}
+#| label: g1a-data-prep
+#| code-summary: Prepare COPD age-gated comparison data
+#| code-fold: true
+#| cache: true
+```
+
+```{r}
+#| label: g1a
+#| code-summary: COPD prevalence — naive vs age-gated
+#| code-fold: true
+#| fig-cap: "COPD prevalence drops when restricting to age-eligible respondents (35+)"
+```
+
+```{r}
+#| label: g1a1
+#| code-summary: All 17 conditions — prevalence in 35+ subsample
+#| code-fold: true
+#| fig-cap: "Condition prevalence restricted to respondents aged 35+ (COPD-eligible subsample)"
+```
+
 ## Graph Family G2: Outcome Relationship
 
 <!-- Research question: How does each condition relate to days_absent_total? -->

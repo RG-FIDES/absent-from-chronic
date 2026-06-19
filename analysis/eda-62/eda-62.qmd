@@ -45,6 +45,11 @@ that exist prior to the onset of illness — demographics (age, sex), social str
 (education, marital status, immigration), and beliefs. They predispose individuals to
 differential health service use.
 
+**`living_arrangements`**: The statistical instructions (§2.2) specify "homeownership" as
+a predisposing variable; however, no house-ownership construct exists in the CCHS PUMF.
+`living_arrangements` (8-level household composition from DHHGLVG) is included as the
+closest available proxy, per agreement with M.-A. Blanchette (2026-05-15 review).
+
 **`days_absent_total`**: Primary outcome. Row-wise sum of all 8 LOP component variables,
 representing total workdays missed in the past 3 months due to health reasons.
 

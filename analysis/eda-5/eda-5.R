@@ -1074,4 +1074,54 @@ ggsave(paste0(prints_folder, "g61_lop_mean_raw.png"),
        g61_lop_mean_raw, width = 8.5, height = 5.5, dpi = 300)
 print(g61_lop_mean_raw)
 
+# ---- g62 ---------------------------------------------------------------------
+# Per-component: percent of respondents with a non-missing, non-zero response
+# Color-mapped to % non-missing (completeness gradient) per Marc-André feedback
+# (2026-05-15: "colors should probably be remapped to percent non-missing")
+
+g62_data <- g6_long %>%
+  group_by(reason_label) %>%
+  summarise(
+    n_total      = n(),
+    n_missing    = sum(status == "Missing (NA)"),
+    n_nonmissing = n_total - n_missing,
+    pct_complete = n_nonmissing / n_total * 100,
+    n_positive   = sum(status == "\u22651 day absent"),
+    pct_positive = n_positive / n_total * 100,
+    .groups = "drop"
+  ) %>%
+  mutate(reason_label = forcats::fct_reorder(reason_label, pct_positive))
+
+g62_completeness <- g62_data %>%
+  ggplot(aes(x = pct_positive, y = reason_label, fill = pct_complete)) +
+  geom_col(width = 0.65, alpha = 0.9) +
+  geom_text(aes(label = sprintf("%.1f%% reported\n(%.0f%% complete)",
+                                pct_positive, pct_complete)),
+            hjust = -0.05, size = 2.8, lineheight = 0.9) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.35)),
+    labels = scales::label_percent(scale = 1)
+  ) +
+  scale_fill_gradient(
+    low  = "#fee0d2",
+    high = "#2ca02c",
+    name = "% Non-Missing\n(completeness)",
+    limits = c(95, 100)
+  ) +
+  labs(
+    title    = "G62: LOP Component Reporting Rate — Colour = Data Completeness",
+    subtitle = "Bar length = % of respondents reporting \u22651 day absent; fill intensity = % non-missing",
+    x        = "% of Respondents Reporting \u22651 Absent Day",
+    y        = NULL,
+    caption  = "Source: CCHS analytical sample (n = 63,843). All components 100% complete post-exclusion."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    legend.position    = "right"
+  )
+print(g62_completeness)
+ggsave(paste0(prints_folder, "g62_completeness.png"),
+       g62_completeness, width = 9, height = 5.5, dpi = 300)
+
 # nolint end

@@ -371,6 +371,46 @@ Three logical flags indicate whether a respondent has complete data for each ana
 
 ------------------------------------------------------------------------
 
+# 7. Clustered Missingness Audit
+
+> **Context (Marc-André, 2026-05-15)**: Several variables share a similar level of
+> missingness (~30%). This section audits whether these form a coherent cluster and
+> documents the mechanism for each — primarily age-gated questions that were only
+> administered to respondents above a certain age threshold.
+
+## 7.1 Age-Gated Variables
+
+The following variables were administered conditionally based on respondent age:
+
+| Variable | Threshold | Mechanism | Coverage |
+|----------|-----------|-----------|----------|
+| `cc_copd` (CCC_091) | 35+ years (DHHGAGE ≥ 8) | COPD question not asked to younger respondents | ~66% |
+| `bmi_category` (HWTGISW) | 18+ years (DHHGAGE ≥ 3) | BMI derived only for adults 18+ | ~95% |
+
+## 7.2 Other Missingness Mechanisms
+
+| Variable | Mechanism | Notes |
+|----------|-----------|-------|
+| `income_hh` (INCGHH) | Non-response / refusal | Income is sensitive; ~5% refuse |
+| `immigration_status` | NOT STATED in source | ~3% codes 9/99 → NA |
+| `occupation_category` (LBSGSOC) | Not applicable for some employment types | Self-employed with no SOC code |
+| `fruit_veg_daily` (FVCGTOT) | Partial module administration | ~10% missing across cycles |
+| `smoking_status` (SMKDSTY) | Complex derived variable | Requires valid responses to multiple source items |
+
+## 7.3 Interpretation
+
+The ~30% missingness cluster is dominated by `cc_copd` (age-gated, 34% missing). When
+this condition is excluded from the complete-case flag, `flag_complete_ccc` would rise from
+66% to approximately 95%. Analysts working exclusively with conditions other than COPD
+should consider subsetting on the 16 remaining conditions rather than using
+`flag_complete_ccc` which penalizes younger respondents.
+
+For COPD-inclusive models, restrict to respondents aged 35+ (DHHGAGE ≥ 8) and impute
+`cc_copd = FALSE` for the younger subsample, following the recommendation from the
+2026-05-15 review session.
+
+------------------------------------------------------------------------
+
 ```{r}
 #| label: session-info
 #| echo: false

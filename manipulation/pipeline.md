@@ -68,7 +68,7 @@ Rscript flow.R
 ## Seven Artifacts
 
 | # | File | Pattern | Status |
-|---|------|---------|--------|
+| --- | --- | --- | --- |
 | 0 | `manipulation/0-extract-metadata.R` | Discovery | Validated |
 | 1 | `manipulation/1-ferry.R` | Ferry | Validated |
 | 2 | `manipulation/2-ellis.R` | Ellis | Validated |
@@ -202,21 +202,23 @@ mapping in the exclusion steps. CCHS uses codes 6/7/8/9 for some variables and
 ## Cross-Cycle Harmonization Reference
 
 | Construct | 2010 variable | 2014 variable | Harmonized name |
-|-----------|--------------|---------------|-----------------|
+| --- | --- | --- | --- |
 | Has regular family doctor | `ACC_50A` | `HCU_1AA` | `hcu_1aa_h` |
 | Country of birth | `SDCGCBG` | `SDCGCB13` | `sdcgcbg_h` |
 
 All other research variables use identical names in both cycles.
+
 ## Cross-Variable Dependency
 
 `immigration_status` requires **both** `SDCFIMM` and `SDCGRES` (both in `vars_inferred`).
 See `INPUT-manifest.md` § Cross-Variable Dependencies for the full rationale.
+
 ## Configuration Reference
 
 All file paths are sourced from `config.yml`:
 
 | Config key | Default path |
-|-----------|-------------|
+| --- | --- |
 | `raw_data.cchs_2010` | `./data-private/raw/2026-02-19/CCHS2010_LOP.sav` |
 | `raw_data.cchs_2014` | `./data-private/raw/2026-02-19/CCHS_2014_EN_PUMF.sav` |
 | `database.cchs.ferry_sqlite` | `./data-private/derived/cchs-1.sqlite` |

@@ -293,6 +293,100 @@ ggsave(paste0(prints_folder, "g12_prevalence_by_cycle.png"),
 
 
 # ==============================================================================
+# G1a FAMILY — COPD Age-Gated Prevalence
+# Context: The COPD question (CCC_091) was administered only to respondents
+#   aged 35+ in the CCHS. Younger respondents have NA on cc_copd because they
+#   were never asked the question — NOT because data is missing.
+#   Marc-André Blanchette (2026-05-15) recommended showing an age-gated
+#   alternative that imputes FALSE for respondents below the threshold and
+#   recalculates prevalence within the target age group only.
+#
+# DHHGAGE code mapping: code 8 = 35-39 yrs → codes 8-15 represent 35-75.
+# g1a  : COPD prevalence with age-gating vs naive (full-sample)
+# g1a1 : All 17 conditions — prevalence restricted to 35+ subsample
+# ==============================================================================
+
+# ---- g1a-data-prep -----------------------------------------------------------
+# Age threshold: DHHGAGE code 8 = 35-39 years (first group >= 35)
+COPD_AGE_THRESHOLD <- 8L
+
+# Respondents aged 35+ (eligible for the COPD question)
+ds0_age35plus <- ds0 %>% filter(dhhgage >= COPD_AGE_THRESHOLD)
+n_age35plus <- nrow(ds0_age35plus)
+
+# Comparison data: COPD prevalence full-sample (naive) vs age-gated
+copd_naive <- ds0 %>%
+
+  summarise(
+    pct_weighted = weighted.mean(cc_copd == TRUE, w = .data[[weight_col]], na.rm = TRUE) * 100,
+    n_valid = sum(!is.na(cc_copd)),
+    n_na    = sum(is.na(cc_copd))
+  ) %>%
+  mutate(approach = "Full sample (N = 63,843)\nNA excluded from denominator")
+
+copd_agegated <- ds0_age35plus %>%
+  mutate(cc_copd_gated = coalesce(cc_copd, FALSE)) %>%
+  summarise(
+    pct_weighted = weighted.mean(cc_copd_gated == TRUE, w = .data[[weight_col]], na.rm = TRUE) * 100,
+    n_valid = n(),
+    n_na    = 0L
+  ) %>%
+  mutate(approach = sprintf("Age-gated 35+ (n = %s)\nNA imputed as FALSE", format(n_age35plus, big.mark = ",")))
+
+g1a_comparison <- bind_rows(copd_naive, copd_agegated)
+
+# All 17 conditions restricted to 35+ subsample
+g1a1_data <- ds0_age35plus %>%
+  select(all_of(cc_vars), !!weight_col) %>%
+  pivot_longer(cols = all_of(cc_vars), names_to = "condition", values_to = "has_condition") %>%
+  mutate(condition_label = cc_labels[condition]) %>%
+  group_by(condition, condition_label) %>%
+  summarise(
+    pct_weighted = weighted.mean(has_condition == TRUE, w = .data[[weight_col]], na.rm = TRUE) * 100,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(pct_weighted))
+
+# ---- g1a --------------------------------------------------------------------
+g1a_copd_agegated <- g1a_comparison %>%
+  ggplot(aes(x = pct_weighted, y = approach)) +
+  geom_col(fill = "#2E8B57", alpha = 0.8, width = 0.5) +
+  geom_text(aes(label = sprintf("%.1f%%", pct_weighted)), hjust = -0.1, size = 4) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(
+    title    = "COPD Prevalence: Full-Sample (naive) vs. Age-Gated (35+)",
+    subtitle = "CCC_091 administered only to respondents aged 35+; younger respondents = not applicable, not missing",
+    x = "Weighted Prevalence (%)",
+    y = NULL,
+    caption  = "Age-gating: DHHGAGE >= 8 (35-39 yrs+). Imputes FALSE for respondents below threshold."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.y = element_blank())
+print(g1a_copd_agegated)
+ggsave(paste0(prints_folder, "g1a_copd_agegated.png"),
+       g1a_copd_agegated, width = 8.5, height = 5.5, dpi = 300)
+
+# ---- g1a1 -------------------------------------------------------------------
+g1a1_prevalence_35plus <- g1a1_data %>%
+  ggplot(aes(x = pct_weighted, y = fct_reorder(condition_label, pct_weighted))) +
+  geom_col(fill = "#4682B4", alpha = 0.8) +
+  geom_text(aes(label = sprintf("%.1f%%", pct_weighted)), hjust = -0.1, size = 3) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title    = "Weighted Prevalence — Restricted to Respondents Aged 35+",
+    subtitle = sprintf("Subsample n = %s; COPD missingness resolved by age-gating", format(n_age35plus, big.mark = ",")),
+    x = "Prevalence (%)",
+    y = NULL,
+    caption  = "COPD: respondents below 35 imputed as FALSE (not asked the question)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.y = element_blank())
+print(g1a1_prevalence_35plus)
+ggsave(paste0(prints_folder, "g1a1_prevalence_35plus.png"),
+       g1a1_prevalence_35plus, width = 8.5, height = 5.5, dpi = 300)
+
+
+# ==============================================================================
 # G2 FAMILY — Outcome Relationship
 # Research question: How does each condition relate to days_absent_total?
 # g2  : mean days absent by condition presence (dot plot)

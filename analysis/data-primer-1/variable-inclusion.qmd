@@ -24,6 +24,42 @@ in the Ellis lane (`manipulation/2-ellis.R`). One table is provided for each var
 category in §2.2. The companion document with actual distributions is:
 [Univariate Distributions](univariate-distributions.html).
 
+---
+
+## Sample Construction Flowchart (§3.1)
+
+The following CONSORT-style diagram documents the sequential exclusion criteria applied
+in `2-ellis.R` to produce the analytical sample. Each step records the number of
+respondents remaining and excluded.
+
+```{mermaid}
+flowchart TD
+    A["<b>Step 0: Full Pooled Sample</b><br/>CCHS 2010 + 2014 combined<br/><b>N = 126,431</b>"] --> B
+    B{"Age filter:<br/>DHHGAGE codes 2–15<br/>(ages 15–75)"} -->|Excluded: ~3,900| C
+    C["<b>Step 1: Age 15–75</b><br/><b>N ≈ 122,500</b>"] --> D
+    D{"Employment filter:<br/>LOP_015 = 1<br/>(worked past 3 months)"} -->|Excluded: ~58,200| E
+    E["<b>Step 2: Employed</b><br/><b>N ≈ 64,248</b>"] --> F
+    F{"Proxy filter:<br/>ADM_PRX ≠ 1<br/>(not proxy interview)"} -->|Excluded: 0| G
+    G["<b>Step 3: Non-Proxy</b><br/><b>N ≈ 64,248</b>"] --> H
+    H{"Outcome completeness:<br/>All 8 LOP day-counts<br/>non-missing (code ≠ 99)"} -->|Excluded: 405| I
+    I["<b>Step 4: Analytic Sample</b><br/><b>N = 63,843</b><br/>69 variables"]
+
+    style A fill:#e8f4fd,stroke:#2c7bb6
+    style I fill:#d4edda,stroke:#28a745
+    style B fill:#fff3cd,stroke:#ffc107
+    style D fill:#fff3cd,stroke:#ffc107
+    style F fill:#fff3cd,stroke:#ffc107
+    style H fill:#fff3cd,stroke:#ffc107
+```
+
+> **Note:** Exact counts at steps 1–3 vary slightly by run depending on NA handling.
+> The final analytic n = 63,843 is stable. Zero proxy respondents were found in the
+> employed subsample. The 405-row exclusion at step 4 reflects genuine non-response
+> (code 99 = "NOT STATED") on at least one LOP day-count variable — not structural
+> survey-skip NAs, which are coded as zero.
+
+---
+
 **Column definitions:**
 
 - **Requested** — Variable as described in §2.2 (conceptual name or derived label).
@@ -151,7 +187,7 @@ equivalent. Student status (`sdcdgstud`) is suppressed in the PUMF and renders a
 | Education level (4 categories) | `edudh04` | `edudh04` | `education` | ✅ Ordered factor: Less than secondary → Post-secondary graduate. ⚠️ Cross-cycle label discrepancy for code 3 ("Other post-secondary" in 2010 vs "Some post-secondary" in 2014; see `data-public/metadata/cchs_value_label_diffs.csv`) |
 | Immigration status | `sdcfimm` | `sdcfimm` | `immigration_status` | ✅ Factor: Non-immigrant / Immigrant / Non-permanent resident |
 | Ethnic origin (White vs. visible minority) | `sdcgcgt` | `sdcgcgt` | `visible_minority` | ✅ Alias `sdcdgcb ← sdcgcgt` resolves; Factor: White / Visible minority |
-| Living arrangements | `dhhglvg` | `dhhglvg` | `living_arrangements` | ✅ Factor (8 levels): Unattached alone / Unattached with others / Couple no children / Couple with children / Single parent / Child in parent-sibling household / Child in two-parent household / Other |
+| Living arrangements | `dhhglvg` | `dhhglvg` | `living_arrangements` | ✅ Factor (8 levels): Unattached alone / Unattached with others / Couple no children / Couple with children / Single parent / Child in parent-sibling household / Child in two-parent household / Other. **Note**: The statistical instructions (§2.2) specify "homeownership" as a predisposing variable; however, no house-ownership construct exists in the CCHS PUMF. `living_arrangements` (household composition) is included as the closest available proxy, per agreement with M.-A. Blanchette (2026-05-15 review). |
 | Student status | ❌ absent | ❌ absent | `student_status` (all NA) | ❌ `sdcdgstud` not present in PUMF; column all-NA in current dataset |
 
 ---

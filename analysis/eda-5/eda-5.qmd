@@ -469,6 +469,17 @@ print(g6_lop_availability)
 print(g61_lop_mean_raw)
 ```
 
+```{r}
+#| label: g62
+#| code-summary: G62 — LOP component reporting rate with completeness colour scale
+#| echo: true
+#| cache: true
+#| fig-width: 9
+#| fig-height: 5.5
+#| fig-cap: "G62: Bar length shows the reporting rate (% with ≥1 absent day); fill colour maps to data completeness (% non-missing). All 8 components are 100% complete in the post-exclusion analytical sample."
+print(g62_completeness)
+```
+
 # Session Info
 
 ```{r}
