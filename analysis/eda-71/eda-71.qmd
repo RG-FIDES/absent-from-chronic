@@ -1,0 +1,440 @@
+---
+title: "EDA 71 — LOP Outcome Profile: Distribution Structure for Statistical Modeling"
+subtitle: "Frequency, Zero-Inflation, and Tail Behaviour of LOP Absence Day Outcomes"
+author: "Analysis Team"
+date: "2026-06-19"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-location: right
+    code-fold: true
+    theme: yeti
+    highlight-style: breeze
+    code-line-numbers: true
+    self-contained: true
+    embed-resources: true
+    keep-md: false
+editor: visual
+editor_options:
+  chunk_output_type: console
+---
+
+# Mission
+
+This EDA characterizes the distributional properties of the LOP (Loss of Productivity) outcome variables to build intuition for statistical models that use these measures as criterion variables. Where EDA-5 decomposed the LOP components into their prevalence and contribution profiles, EDA-71 focuses on the **modeling-context lens**: the shape of the frequency distribution across day-count bins, zero-inflation severity, the composite outcome's heavy-tail structure, and inter-component correlation.
+
+**Research Questions:**
+
+1.  How does each of the 8 LOP component variables distribute across positive day-count bins? How do the marginal-prevalence curves differ in height (overall positive prevalence) and in tail decay (how quickly they drop with increasing day count)?
+2.  What is the zero-inflation fraction for each LOP component — and how does it differ across the 8 reasons?
+3.  How does the composite outcome `days_absent_total` distribute — its zero mass, right-tail shape, and key quantiles?
+4.  How correlated are the 8 LOP components, and what does this imply for using the total as a single model criterion?
+
+> **Bootstrap weights note**: Confidence intervals via bootstrap are not available for CCHS 2010 and 2014 PUMF cycles. All variance-sensitive summaries use the pooled master weight (`wts_m_pooled`) only. See CACHE manifest.
+
+Following the dual-file development pattern, all analytical code lives in `analysis/eda-71/eda-71.R`. This document sources those chunks for presentation.
+
+# Definition of Terms
+
+**LOP module**: Loss of Productivity module from the CCHS. Respondents are asked how many workdays they missed in the past 3 months due to each of 8 distinct health-related reasons.
+
+**`days_absent_total`**: The primary outcome. Row-wise sum of all 8 LOP component variables (`lopg040` + `lopg070` + `lopg082`–`lopg086` + `lopg100`), capped at 90 days.
+
+**`days_absent_chronic`**: The sensitivity outcome. Days missed due to chronic condition only (`lopg040`), capped at 90 days.
+
+**Marginal prevalence**: In this EDA, "prevalence at bin *k*" means the weighted percentage of **all** respondents (including those with zero days for that reason) who fall in bin *k*. Zero-day respondents are included in the denominator, giving population-level marginal probabilities rather than conditional-on-reporter proportions.
+
+**Zero-inflation**: The structural over-representation of zero responses. In the LOP context, zero is a valid response (the respondent was employed but missed no days for that reason). It is not missing data. The distinction is confirmed in Ellis pipeline step 4 and validated in EDA-5/G6.
+
+**LOP reason categories (8 components):**
+
+| Variable  | Reason                                |
+|-----------|---------------------------------------|
+| `lopg040` | Own chronic condition                 |
+| `lopg070` | Injury                                |
+| `lopg082` | Cold                                  |
+| `lopg083` | Flu / influenza                       |
+| `lopg084` | Gastroenteritis (stomach flu)         |
+| `lopg085` | Respiratory infection                 |
+| `lopg086` | Other infectious disease              |
+| `lopg100` | Other physical / mental health reason |
+
+```{r}
+#| label: knitr-root
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+cat("Working directory: ", getwd())
+library(knitr)
+opts_knit$set(root.dir = "../../")
+```
+
+```{r}
+#| label: set_options
+#| code-summary: Report-wide formatting options
+#| echo: false
+#| results: hide
+#| message: false
+cat("Working directory: ", getwd())
+report_render_start_time <- Sys.time()
+opts_chunk$set(
+  results   = "show",
+  message   = FALSE,
+  warning   = FALSE,
+  comment   = NA,
+  tidy      = FALSE,
+  out.width = "960px",
+  fig.width  = 8.5,
+  fig.height = 5.5,
+  fig.path   = "figure-png-iso/"
+)
+options(width = 100)
+ggplot2::theme_set(ggplot2::theme_minimal())
+read_chunk("analysis/eda-71/eda-71.R")
+```
+
+# Environment
+
+```{r}
+#| label: load-packages
+#| code-summary: Packages used in this report
+#| echo: false
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: load-sources
+#| code-summary: Project-level utilities and graph presets
+#| echo: false
+#| results: hide
+#| message: false
+#| code-fold: true
+```
+
+```{r}
+#| label: declare-globals
+#| code-summary: Paths, LOP component map, frequency bin levels
+#| echo: false
+#| results: markup
+#| code-fold: true
+```
+
+```{r}
+#| label: load-data
+#| code-summary: Load cchs_analytic.parquet (n = 63,843)
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+# Data Context
+
+For complete data documentation, see the [Data Primer](../data-primer-1/univariate-distributions.html).
+
+```{r}
+#| label: data-context-tables
+#| code-summary: Source table and file location
+#| echo: false
+#| results: markup
+```
+
+```{r}
+#| label: data-context-person
+#| code-summary: Representative respondents — LOP components and derived outcomes visible
+#| echo: false
+#| results: markup
+```
+
+```{r}
+#| label: data-context-distributions
+#| code-summary: Weighted positive prevalence, mean, and median per LOP component
+#| echo: false
+#| results: markup
+```
+
+```{r}
+#| label: tweak-data-0
+#| code-summary: Reshape to long-form LOP dataset (shared ancestor for all graph families)
+#| echo: false
+#| cache: true
+#| results: hide
+```
+
+# Analysis
+
+## Opening Lens — What The Criterion Measures
+
+Before reading `G1+`, anchor interpretation on what `days_absent_total` represents in this dataset:
+
+1. It is a **3-month count outcome**: total work days missed in the past three months due to 8 health-related reasons.
+2. It is analyzed with **pooled survey weight** `wts_m_pooled` (not raw `wts_m`) because two cycles are combined.
+3. A weighted quantity is population-representative for the employed-worker target frame used by the LOP module.
+
+This report uses two complementary perspectives that should be kept separate:
+
+1. **Population burden perspective**: how much each reason contributes to total productivity loss in absolute and relative terms.
+2. **Reporter intensity perspective**: among workers with non-zero days for a reason, how many days are typically lost and how variable that intensity is.
+
+EDA-5 already provides the full decomposition workflow (prevalence, contribution, co-occurrence). Here we use a compact orientation visual so later graphs can be read with the right denominator logic.
+
+```{r}
+#| label: g0-data-prep
+#| code-summary: Compute prevalence, absolute burden, relative contribution, and conditional intensity per LOP reason
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g0
+#| code-summary: "G0 duality map: contribution to total burden vs intensity among reporters"
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "G0: Each point is one LOP reason. X-axis is weighted prevalence (% of workers with >=1 day), Y-axis is weighted mean days among reporters (>0), point size is absolute burden (days per 100 workers), and colour is relative share of total days_absent_total. This visual separates contribution (how much a reason matters at population level) from intensity (how severe episodes are among affected workers). For full decomposition details, see EDA-5."
+```
+
+### Chronic Condition — Concrete Interpretation of Each Opening-Lens Value
+
+The chronic row should be read literally as a weighted population statement for the employed-worker frame in the LOP module.
+
+Definition check against survey documentation:
+
+1. The gate is employment in the past 3 months (`LOP_015`: “Did you work at a job or a business at any time in the past three months?”): [data-private/derived/2026-02-19/CCHS_2014_DataDictionary_Freqs.txt](data-private/derived/2026-02-19/CCHS_2014_DataDictionary_Freqs.txt#L18957).
+2. Chronic-condition absence is asked as missed work days in the past 3 months due to chronic condition (`LOP_030` + derived `LOPG040`): [data-private/derived/2026-02-19/CCHS_2014_DataDictionary_Freqs.txt](data-private/derived/2026-02-19/CCHS_2014_DataDictionary_Freqs.txt#L19019), [data-private/derived/2026-02-19/CCHS_2010_Record_Layout.txt](data-private/derived/2026-02-19/CCHS_2010_Record_Layout.txt#L1539).
+3. The analytical criterion is the 8-component sum in Ellis (`days_absent_total = lopg040 + ... + lopg100`) with pooled weight usage (`wts_m_pooled = wts_m / 2`): [manipulation/2-ellis.R](manipulation/2-ellis.R#L263), [manipulation/2-ellis.R](manipulation/2-ellis.R#L406).
+
+```{r}
+#| label: g0-chronic-interpretation
+#| code-summary: Plain-language interpretation of each chronic-condition metric in the opening lens table
+#| echo: false
+#| results: markup
+```
+
+## G1 — Frequency Distribution Curves per LOP Reason
+
+**Framing question**: How does each of the 8 LOP component variables distribute across positive day-count bins?
+
+
+```{r}
+#| label: g1-data-prep
+#| code-summary: Bin day counts into 9 ordered categories; compute weighted marginal prevalence per reason
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g1
+#| code-summary: "G1 — Line graph: marginal prevalence curves by LOP reason across day-count bins"
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "G1: Each line traces the frequency distribution of one LOP component variable. Lines starting higher at '1 day' have greater overall positive prevalence. Lines that decay slowly across the higher bins (e.g., chronic condition, injury) signal heavy-tailed distributions — these reasons produce prolonged absence episodes. Lines that collapse quickly after 1–2 days (e.g., cold, flu, gastroenteritis) reflect short, acute absence. The vertical spread at each bin maps directly to cross-reason heterogeneity relevant for model specification."
+```
+
+
+In G1, each point on a line is a **marginal prevalence** value: the weighted percentage of all employed workers who fall in that exact day bin for that reason. Zero-day workers are not plotted on the x-axis, but they remain in the denominator.
+
+Practical reading rule:
+
+1. A value of 1.0% at a bin means about 1 per 100 workers (or 10 per 1,000 workers) are in that bin for that reason.
+2. A value of 0.25% means about 2.5 per 1,000 workers.
+
+What should the points add up to?
+
+1. For a given reason, summing all G1 y-values across the positive bins gives that reason's positive prevalence from G0: `% with >=1 day`.
+2. The sum does **not** equal 100%, because 0-day workers are in the denominator but excluded from plotted bins.
+
+Why collapsed bins (`6–10`, `11–15`, `16–30`, `31+`) instead of integer days?
+
+1. Tail counts are sparse at high day values for each reason, so single-day bins become unstable and visually noisy.
+2. Collapsing preserves shape information needed for modeling (front-loaded vs heavy-tail) while improving comparability across 8 lines on one panel.
+3. This is intentional contrast with EDA-5 G01, where the focus was the single composite outcome and integer-level detail among `>=1` reporters.
+
+Interpretive pattern:
+
+1. Higher first-bin points indicate more common short absences at population level.
+2. Slower decay into upper bins indicates heavier tails and more prolonged episodes.
+
+### G11 — Faceted Shape Benchmarks for Each LOP Variable (plus Total)
+
+G1 compares all reasons on one canvas, which is useful for global ranking but harder for fine shape diagnosis. G11 switches to a 3×3 faceted view where 8 panels show individual LOP components and a 9th panel shows the composite `days_absent_total`. Each panel compares its focal outcome to two fixed benchmarks:
+
+- Chronic benchmark (`days_absent_chronic`)
+- Total benchmark (`days_absent_total`)
+
+To isolate **shape** rather than prevalence level, the y-axis is normalized within positive counts (shares sum to 100% across bins for each series). This reveals whether each reason is more front-loaded (acute, short-duration) or more tail-heavy (prolonged absence) relative to the two benchmark outcomes. The 9th facet (Total) lets you see how the composite outcome's shape compares to individual components.
+
+```{r}
+#| label: g11-data-prep
+#| code-summary: Build faceted shape-comparison data with chronic and total benchmark overlays
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g11
+#| code-summary: "Faceted shape overlays: each LOP variable vs chronic and total benchmarks"
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 8.5
+#| fig-cap: "G11: 3×3 faceted shape comparison with 9 panels: 8 LOP components plus a 9th focal facet for days_absent_total. The focal series (blue solid with area fill to y=0) is compared against chronic (orange dashed) and total (gray dotted) benchmarks in each facet; the total facet omits its own benchmark to avoid redundancy. A thin y=0 baseline anchors visual comparison across panels. Because each curve is normalized to its own positive-day mass, vertical differences represent shape (front-loading vs tail-heaviness), not overall prevalence. The total outcome facet shows how the composite 9-day pool distributes relative to individual reasons."
+```
+
+## G2 — Distribution of the Modeled Chronic-Illness Outcome
+
+**Framing question**: What does the modeled outcome `days_absent_chronic` actually look like before any transformation or count-model assumption is imposed?
+
+This section now has a two-part layout in both G2 and G21:
+
+1.  **Left, narrow panel**: one 100% stacked bar partitioning the full analytic sample into three mutually exclusive groups.
+2.  **Right, wide panel**: the exact chronic-day distribution among respondents who reported at least one chronic-absence day.
+
+Keep the denominators straight:
+
+1.  In the left raw bar, the three segment counts add to the analytic sample size, 63,843.
+2.  In the left weighted bar, the three segment shares add to 100% of the employed-worker population frame.
+3.  In the right panel, only chronic reporters appear, so the bars describe the positive support of `days_absent_chronic` rather than the full sample.
+4.  The right panel intentionally follows the G01 logic from EDA-5: exact integer bars are colored by broader day-range bands so local spikes remain visible without losing tail structure.
+
+```{r}
+#| label: g2-data-prep
+#| code-summary: Build the three-way sample partition plus exact positive-day distributions for days_absent_chronic
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g2
+#| code-summary: Composite raw view — sample partition and exact positive-day counts for days_absent_chronic
+#| echo: false
+#| cache: false
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "G2: Composite raw view of the modeled chronic-absence outcome. Left: a single 100% stacked bar partitions the 63,843 analytic respondents into three groups: no missed days of any kind, at least one chronic-illness day, and other-only missed days with zero chronic days. Right: among chronic reporters only, bars show the exact integer questionnaire values for days_absent_chronic, using the same day-range color logic as G01 in EDA-5. This separates the overall sample partition from the detailed positive chronic tail that later shape checks will evaluate."
+```
+
+```{r}
+#| label: g21
+#| code-summary: Composite weighted view — population partition and exact positive-day shares for days_absent_chronic
+#| echo: false
+#| cache: false
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "G21: Composite weighted view of the same chronic-absence outcome. Left: the full employed-worker population is partitioned into the same three mutually exclusive groups, now using pooled survey weights so the bar sums to 100%. Right: among chronic reporters only, each exact positive chronic-day value is shown as a weighted share of that chronic-reporter subpopulation, again using the G01 day-range color logic. This makes the positive-tail shape readable after the overall prevalence split has already been shown on the left."
+```
+
+## Modeled-Outcome Shape Checks — days_absent_chronic
+
+Now that G2 has shown the raw and weighted empirical distribution of `days_absent_chronic`, we can ask the next question: which outcome scale best regularizes the positive tail for diagnostics and moment-based summaries?
+
+This section separates two linked issues:
+
+1.  G2 already showed the empirical **zero mass** directly on the raw outcome scale.
+2.  The checks below ask how the **positive tail** behaves under candidate transformations once that zero mass is acknowledged.
+
+The table below states the modeling assumptions for each candidate scale. Then we compare empirical shape diagnostics and ECDF curves to see how strongly each transformation compresses upper-tail behavior for the chronic-absence outcome.
+
+```{r}
+#| label: t1-modeling-assumptions
+#| code-summary: Candidate transformation scales and their modeling assumptions
+#| echo: false
+#| results: markup
+```
+
+```{r}
+#| label: g15-data-prep
+#| code-summary: Create transformed days_absent_chronic variants and summarize zero-mass, quantiles, and skewness
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g15
+#| code-summary: ECDF comparison of raw, sqrt, log1p, and IHS scales for days_absent_chronic
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Modeled-outcome diagnostic: the raw chronic-absence scale retains pronounced right-tail behavior, while sqrt, log1p, and IHS progressively compress the upper tail. G2 already established the empirical zero mass; these panels focus on how the positive tail would behave under alternative scales for diagnostics, residual checks, and moment-based summaries."
+```
+
+### Why Gaussian Approximation Matters for Moments
+
+The ECDF above shows that transformations compress the tail — but *why* does that help us? The answer lies in how we interpret a distribution's **moments** (mean and standard deviation):
+
+-   The **mean** is meant to represent the "typical" value — the center of mass. When a distribution is strongly right-skewed, the mean is pulled toward the tail and no longer represents a typical respondent. Instead it reflects a compromise between the bulk of zeros/low values and the rare extreme values.
+-   The **standard deviation** is meant to capture symmetric spread around the mean — "how far a typical observation falls from center." Under skew, SD conflates two different phenomena: the tight cluster of low values *and* the sparse tail of high values. It loses its intuitive interpretation as a single "spread" measure.
+
+A Gaussian (normal) distribution is the **reference case** where moments are maximally informative: the mean *is* the mode *is* the median, and ±1 SD captures exactly 68% of observations symmetrically. The closer our transformed outcome approximates this shape, the more trustworthy and interpretable its summary statistics become for modeling:
+
+-   Regression coefficients (which estimate shifts in the conditional mean) describe shifts in the *typical* outcome, not shifts distorted by tail behavior.
+-   Confidence intervals and prediction intervals based on ±SE have correct coverage.
+-   Effect size comparisons (Cohen's *d*, standardized betas) carry their intended meaning.
+
+The graph below overlays the empirical density (blue) against a Gaussian with the *same* mean and SD (dashed orange) for each candidate scale. Where the two curves diverge, the moments are "lying" — summarizing a shape they don't actually describe. Where they overlap, the moments are trustworthy descriptors for the chronic-absence outcome.
+
+```{r}
+#| label: g16
+#| code-summary: Empirical density vs fitted Gaussian — visual test of moment interpretability per scale
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "Density vs. Gaussian overlay: on the raw scale the empirical density (blue) diverges sharply from the fitted normal (orange dashed) — the mean overstates 'typical' and SD conflates the zero-mass spike with the long tail. Under sqrt, log1p, and especially IHS, the curves converge, signaling that the mean and SD become progressively more honest summaries of location and spread. This is why transformation matters even when we ultimately model counts: diagnostic checks, residual analysis, and effect-size interpretation all improve when the conditional distribution approximates normality."
+```
+
+### Why Zero-Inflated Negative Binomial (ZINB)?
+
+The G2 chronic-outcome distributions and the shape diagnostics above expose three features of the modeled day-count outcome that jointly rule out simpler alternatives and point toward a **Zero-Inflated Negative Binomial (ZINB)** framework for future statistical modeling:
+
+1.  **Count nature of the outcome.** Days absent is a non-negative integer. This immediately places the outcome in the generalized linear model family for counts (Poisson, Negative Binomial) rather than the Gaussian family. Transformations like `log1p` or `sqrt` can approximate normality visually, but they distort the mean–variance relationship and complicate back-transformation for policy-relevant effect sizes. A count-native likelihood preserves interpretability.
+
+2.  **Overdispersion (variance \>\> mean).** A Poisson model assumes the conditional mean equals the conditional variance. The heavy right tail visible in the raw ECDF — and the large gap between P90 and P99 — signals that the variance far exceeds the mean. The **Negative Binomial** (NB) generalizes the Poisson by adding a dispersion parameter that accommodates this extra-Poisson variability. Without it, standard errors would be artificially narrow and inference misleading.
+
+3.  **Excess zeros from a dual process.** The data contain two kinds of zeros: (a) respondents who *could not* have been absent for a given reason regardless of exposure (structural zeros — e.g., a worker whose chronic condition is well-managed and would never generate absence), and (b) respondents *at risk* of absence who happened to have zero days in the recall window (sampling zeros). Treating all zeros alike under a standard NB model underestimates the probability of zero and biases the count-process coefficients upward. A **zero-inflated** mixture explicitly models these as two separate processes:
+
+    -   A **logistic (inflate) component** predicting the probability of being a structural zero.
+    -   A **count (NB) component** modeling the number of days among those at risk.
+
+**Relevance for upcoming modeling.** When we build regression models of `days_absent_chronic` as a function of chronic condition status, demographics, and cycle, the ZINB framework lets us ask *two distinct research questions* with a single model:
+
+-   *Who is at risk of any absence?* (inflate component — identifies predictors of structural zeros)
+-   *Among those at risk, what drives higher day counts?* (count component — quantifies effect sizes on the expected count)
+
+The G2 family above already quantified the zero-heavy empirical support of the chronic-absence outcome directly. The shape diagnostics here complement that view by asking what happens once the positive tail is transformed and compared against Gaussian-style moment summaries.
+
+## G3 — Composite Outcome Distribution *(stub)*
+
+**Framing question**: How does `days_absent_total` distribute — its zero mass, right-tail shape, and key quantiles?
+
+*Graph family to be developed.*
+
+## G4 — Component Correlation Structure *(stub)*
+
+**Framing question**: How correlated are the 8 LOP components, and what does this imply for using the total as a single model criterion?
+
+*Graph family to be developed.*
+
+# Session Info
+
+```{r}
+#| label: session-info
+#| code-summary: Reproducibility record
+#| echo: false
+#| results: markup
+#| code-fold: true
+cat("Rendered:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+sessionInfo()
+```
