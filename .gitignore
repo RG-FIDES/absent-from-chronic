@@ -118,13 +118,6 @@ analysis/**/*.html
 !.vscode/launch.json
 !.vscode/settings.json.example
 
-# -------- renv files ---------
-
-!*renv.lock
-!*renv/library/
-!*.Rprofile
-!*renv/activate.R
-!*renv/settings.json
 # --- Dictionary files ---
 *-dictionary*.md
 
@@ -152,7 +145,6 @@ _freeze/analysis/eda-2/eda-2/execute-results/html.json
 _freeze/analysis/eda-1/eda-1/execute-results/html.json
 _freeze/analysis/eda-2/eda-2/execute-results/html.json
 
-/.venv/
 /analysis/eda-2/eda-2_files/
 /analysis/eda-2/*.png
 /analysis/eda-2/figure-png-iso/*.png

@@ -135,7 +135,7 @@ The template includes an intelligent memory system that maintains project contin
 
 3. **Install R Dependencies** 
    
-   **Choose your preferred approach** (see `docs/environment-management.md` for detailed comparison):
+   **Choose your preferred approach** (see `guides/environment-management.md` for detailed comparison):
 
    **Option A: Enhanced CSV System (Default - Flexible)**
    ```r
@@ -146,13 +146,7 @@ The template includes an intelligent memory system that maintains project contin
    Rscript utility/install-packages.R
    ```
    
-   **Option B: renv (Strict Reproducibility)**
-   ```r
-   # For exact reproducibility (research publication)
-   Rscript utility/init-renv.R
-   ```
-   
-   **Option C: Conda (Cross-Language Projects)**
+   **Option B: Conda (Cross-Language Projects)**
    ```bash
    # For R + Python workflows
    conda env create -f environment.yml

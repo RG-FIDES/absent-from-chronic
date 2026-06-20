@@ -179,6 +179,9 @@ ds_rail  <- tibble::tribble(
   # "run_qmd"   , "analysis/eda-64/eda-64.qmd",      # EDA-64: Needs report
   "run_qmd"   , "analysis/eda-5/eda-5.qmd",        # EDA-5: LOP component decomposition §4.1 + §4.2 (composed, not yet active)
 
+  # ---- Series 7: Outcome Profile ---------------------------------------------
+  # "run_qmd"   , "analysis/eda-71/eda-71.qmd",     # EDA-71: LOP outcome profile — distribution structure for modeling context (composed, not yet active)
+
 
 )
 
