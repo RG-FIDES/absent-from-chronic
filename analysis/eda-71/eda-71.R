@@ -998,13 +998,263 @@ ggsave(
 grid::grid.newpage()
 grid::grid.draw(g21_chronic_weighted_distribution)
 
+# ---- g22-data-prep -----------------------------------------------------------
+# g22 splits the right panel into two: top shows chronic-day distribution (same as g2 right),
+# bottom shows distribution of days_absent_other for the same chronic-reporter cohort.
+
+# Create days_absent_other variable: total days minus chronic days
+g22_other_analysis <- ds0 %>%
+  transmute(
+    category = dplyr::case_when(
+      days_absent_total == 0 ~ "No missed days",
+      days_absent_chronic > 0 ~ ">=1 chronic day",
+      days_absent_chronic == 0 & days_absent_total > 0 ~ "Other-only missed day",
+      TRUE ~ NA_character_
+    ),
+    weight_value = .data[[weight_col]],
+    days_absent_chronic = as.integer(days_absent_chronic),
+    days_absent_total = as.integer(days_absent_total),
+    days_absent_other = as.integer(days_absent_total - days_absent_chronic)
+  ) %>%
+  filter(!is.na(category) & days_absent_chronic > 0)
+
+# Get the other-reason positive distribution with day-range mapping
+g22_other_positive_distribution <- g22_other_analysis %>%
+  mutate(
+    day_range = dplyr::case_when(
+      days_absent_other == 0  ~ "0 days",
+      days_absent_other == 1  ~ "1 day",
+      days_absent_other == 2  ~ "2 days",
+      days_absent_other == 3  ~ "3 days",
+      days_absent_other == 4  ~ "4 days",
+      days_absent_other == 5  ~ "5 days",
+      days_absent_other <= 10 ~ "6–10 days",
+      days_absent_other <= 15 ~ "11–15 days",
+      days_absent_other <= 30 ~ "16–30 days",
+      TRUE ~ "31+ days"
+    ),
+    day_range = factor(day_range, levels = c("0 days", bin_levels))
+  )
+
+# Aggregate by exact numeric day for other-reason distribution
+g22_other_binned_distribution <- g22_other_positive_distribution %>%
+  group_by(days_absent_other, day_range) %>%
+  summarise(
+    n_raw = dplyr::n(),
+    wt_sum = sum(weight_value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  # Ensure every observed day is shown (step = 1)
+  tidyr::complete(
+    days_absent_other = seq(
+      0,
+      max(g22_other_positive_distribution$days_absent_other, na.rm = TRUE),
+      by = 1
+    ),
+    fill = list(n_raw = 0, wt_sum = 0)
+  ) %>%
+  mutate(
+    day_range = dplyr::case_when(
+      days_absent_other == 0  ~ "0 days",
+      days_absent_other == 1  ~ "1 day",
+      days_absent_other == 2  ~ "2 days",
+      days_absent_other == 3  ~ "3 days",
+      days_absent_other == 4  ~ "4 days",
+      days_absent_other == 5  ~ "5 days",
+      days_absent_other <= 10 ~ "6–10 days",
+      days_absent_other <= 15 ~ "11–15 days",
+      days_absent_other <= 30 ~ "16–30 days",
+      TRUE ~ "31+ days"
+    ),
+    day_range = factor(day_range, levels = c("0 days", bin_levels))
+  )
+
+g22_other_x_min <- 0
+g22_other_x_max <- max(g22_other_binned_distribution$days_absent_other, na.rm = TRUE)
+g22_other_x_major_breaks <- sort(unique(c(
+  g22_other_x_min,
+  if (g22_other_x_min <= 1 && g22_other_x_max >= 1) 1 else numeric(0),
+  seq(5 * ceiling(g22_other_x_min / 5), 5 * floor(g22_other_x_max / 5), by = 5)
+)))
+g22_other_x_major_breaks <- sort(unique(c(g22_other_x_major_breaks, g22_other_x_max)))
+g22_other_x_minor_breaks <- seq(g22_other_x_min, g22_other_x_max, by = 1)
+g22_other_x_ten_guides <- seq(10 * ceiling(g22_other_x_min / 10), 10 * floor(g22_other_x_max / 10), by = 10)
+g22_top_y_max <- max(g2_chronic_binned_distribution$n_raw, na.rm = TRUE)
+g22_top_y_limits <- c(0, g22_top_y_max * 1.08)
+g22_top_y_breaks <- seq(0, 800, by = 100)
+
+g22_bottom_plot_data <- g22_other_binned_distribution %>%
+  dplyr::filter(days_absent_other >= 0)
+g22_bottom_y_max <- max(g22_bottom_plot_data$n_raw, na.rm = TRUE)
+g22_bottom_y_limits <- c(0, g22_bottom_y_max * 1.08)
+g22_bottom_y_breaks <- pretty(g22_bottom_y_limits, n = 6)
+
+g22_other_day_range_colours <- c("0 days" = "#B8B8B8", g2_day_range_colours)
+
+# ---- compose_three_panel_grob ------------------------------------------------
+# Compose left-spanning panel + top-right + bottom-right layout
+compose_three_panel_grob <- function(left_plot, top_right_plot, bottom_right_plot,
+                                      left_width = 0.22, right_width = 0.78) {
+  left_grob <- ggplot2::ggplotGrob(left_plot)
+  top_right_grob <- ggplot2::ggplotGrob(top_right_plot)
+  bottom_right_grob <- ggplot2::ggplotGrob(bottom_right_plot)
+
+  grid::grid.grabExpr({
+    grid::grid.newpage()
+    grid::pushViewport(
+      grid::viewport(
+        layout = grid::grid.layout(
+          nrow = 2,
+          ncol = 2,
+          heights = grid::unit(c(0.5, 0.5), "npc"),
+          widths = grid::unit(c(left_width, right_width), "npc")
+        )
+      )
+    )
+    # Left column (spans both rows)
+    grid::pushViewport(grid::viewport(layout.pos.row = 1:2, layout.pos.col = 1))
+    grid::grid.draw(left_grob)
+    grid::upViewport()
+    # Top-right
+    grid::pushViewport(grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+    grid::grid.draw(top_right_grob)
+    grid::upViewport()
+    # Bottom-right
+    grid::pushViewport(grid::viewport(layout.pos.row = 2, layout.pos.col = 2))
+    grid::grid.draw(bottom_right_grob)
+    grid::upViewport(2)
+  }, wrap.grobs = TRUE)
+}
+
+# ---- g22 - top-right (chronic days) -------------------------------------------
+# Reuse the g2 right panel (chronic distribution) as the top-right of g22
+g22_top_right_raw_distribution <- g2_chronic_binned_distribution %>%
+  ggplot(aes(x = days_absent_chronic, y = n_raw, fill = day_range)) +
+  geom_vline(
+    xintercept = g2_x_ten_guides,
+    colour = "#D9D9D9",
+    linewidth = 0.35
+  ) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  geom_col(
+    data = ~ dplyr::filter(.x, days_absent_chronic == 1),
+    width = 0.9, colour = "black", fill = NA, alpha = 0.5
+  ) +
+  scale_x_continuous(
+    breaks = g2_x_major_breaks,
+    minor_breaks = g2_x_minor_breaks,
+    limits = c(g2_x_min, g2_x_max + 1),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    breaks = g22_top_y_breaks,
+    limits = g22_top_y_limits,
+    expand = expansion(mult = c(0, 0))
+  ) +
+  scale_fill_manual(values = g2_day_range_colours, name = "Day range") +
+  labs(
+    title = "Chronic-absence distribution",
+    subtitle = paste0("n = ", scales::comma(g2_positive_n), " with ≥1 chronic day"),
+    x = "Chronic-absence days (numeric)",
+    y = "Respondent count"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_line(colour = "#ECECEC", linewidth = 0.20),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(size = 8),
+    legend.position = c(0.985, 0.985),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "#FFFFFFDD", colour = "#D0D0D0"),
+    legend.key.size = grid::unit(0.28, "cm"),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 6),
+    plot.margin = margin(5.5, 5.5, 2.75, 6)
+  ) +
+  guides(fill = guide_legend(ncol = 1, byrow = TRUE))
+
+# ---- g22 - bottom-right (other-reason days) -----------------------------------
+# Create distribution plot for days_absent_other
+g22_bottom_right_other_distribution <- g22_bottom_plot_data %>%
+  ggplot(aes(x = days_absent_other, y = n_raw, fill = day_range)) +
+  geom_vline(
+    xintercept = g22_other_x_ten_guides,
+    colour = "#D9D9D9",
+    linewidth = 0.35
+  ) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  geom_col(
+    data = ~ dplyr::filter(.x, days_absent_other == 1),
+    width = 0.9, colour = "black", fill = NA, alpha = 0.5
+  ) +
+  scale_x_continuous(
+    breaks = g22_other_x_major_breaks,
+    minor_breaks = g22_other_x_minor_breaks,
+    limits = c(g22_other_x_min - 1, g22_other_x_max + 1),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    breaks = g22_bottom_y_breaks,
+    limits = g22_bottom_y_limits,
+    expand = expansion(mult = c(0, 0))
+  ) +
+  scale_fill_manual(values = g22_other_day_range_colours, name = "Day range") +
+  labs(
+    title = "Other-reason absence distribution",
+    subtitle = paste0("Same cohort as top panel (n = ", scales::comma(sum(g22_other_binned_distribution$n_raw, na.rm = TRUE)), "); bars include the 0-day non-chronic bin"),
+    x = "Other-reason absence days (numeric)",
+    y = "Respondent count"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_line(colour = "#ECECEC", linewidth = 0.20),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(size = 8),
+    legend.position = c(0.985, 0.985),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "#FFFFFFDD", colour = "#D0D0D0"),
+    legend.key.size = grid::unit(0.28, "cm"),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 6),
+    plot.margin = margin(2.75, 5.5, 5.5, 6)
+  ) +
+  guides(fill = guide_legend(ncol = 1, byrow = TRUE))
+
+# ---- g22 -----------------------------------------------------------------------
+# Compose three-panel layout: left chronic partition spans both rows, right split vertically
+
+g22_chronic_raw_split_distribution <- compose_three_panel_grob(
+  g2_left_raw_bar,
+  g22_top_right_raw_distribution,
+  g22_bottom_right_other_distribution,
+  left_width = 0.22,
+  right_width = 0.78
+)
+
+# Display for Quarto figure capture
+grid::grid.draw(g22_chronic_raw_split_distribution)
+
+# Save high-res version to prints folder
+ggsave(
+  paste0(prints_folder, "g22_chronic_vs_other_raw_split_distribution.png"),
+  g22_chronic_raw_split_distribution, width = 8.5, height = 7, dpi = 300
+)
+
+
 
 # =============================================================================
-# MODELED-OUTCOME SHAPE CHECKS — days_absent_chronic
-# Purpose: after showing the empirical chronic-absence distribution in raw and
-# weighted form, inspect how candidate transformations compress the positive
-# tail and improve moment-based summaries.
+# G3 FAMILY — Modeled-Outcome Shape Checks for days_absent_chronic
+# Purpose: Evaluate candidate transformations for two-part/hurdle modeling:
+# (g31) Full distribution (y >= 0): compare transformations that handle zero,
+#       informing zero-inflation / hurdle probability component
+# (g32) Positive-part only (y > 0): assess normality of conditional distribution,
+#       informing model specification for chronic reporters
 # =============================================================================
+
 
 # ---- t1-modeling-assumptions -------------------------------------------------
 t1_modeling_assumptions <- tibble::tribble(
@@ -1041,10 +1291,10 @@ if (isTRUE(getOption("knitr.in.progress"))) {
   print(t1_modeling_assumptions)
 }
 
-# ---- g15-data-prep -----------------------------------------------------------
-# Build long-form transformed variants of days_absent_chronic to compare
-# shape diagnostics side-by-side.
-g15_transform_data <- ds0 %>%
+# ---- g31-data-prep -----------------------------------------------------------
+# Build long-form transformed variants of days_absent_chronic (full sample, y >= 0)
+# to compare shape diagnostics side-by-side.
+g31_transform_data <- ds0 %>%
   transmute(
     y_raw   = days_absent_chronic,
     y_sqrt  = sqrt(days_absent_chronic),
@@ -1083,7 +1333,7 @@ skewness_estimate <- function(x) {
   mean((x - m)^3) / (s^3)
 }
 
-g15_shape_summary <- g15_transform_data %>%
+g31_shape_summary <- g31_transform_data %>%
   group_by(scale_label) %>%
   summarise(
     zero_mass_pct = mean(value == 0, na.rm = TRUE) * 100,
@@ -1093,7 +1343,7 @@ g15_shape_summary <- g15_transform_data %>%
     .groups = "drop"
   )
 
-g15_shape_table <- g15_shape_summary %>%
+g31_shape_table <- g31_shape_summary %>%
   mutate(
     scale_label = as.character(scale_label),
     zero_mass_pct = sprintf("%.2f%%", zero_mass_pct),
@@ -1104,28 +1354,29 @@ g15_shape_table <- g15_shape_summary %>%
 
 if (isTRUE(getOption("knitr.in.progress"))) {
   knitr::kable(
-    g15_shape_table,
+    g31_shape_table,
     format = "html",
     col.names = c("Scale", "Zero mass", "P90", "P99", "Skewness"),
     align = c("l", "r", "r", "r", "r"),
-    caption = "Modeled-outcome table: shape diagnostics for days_absent_chronic across candidate scales"
+    caption = "g31 table: shape diagnostics (full sample) for days_absent_chronic across candidate scales"
   )
 } else {
-  print(g15_shape_table)
+  print(g31_shape_table)
 }
 
-# ---- g15 ---------------------------------------------------------------------
-# ECDF overlays in faceted panels make skew reduction and tail compression easy to compare.
-g15_transform_ecdf <- g15_transform_data %>%
+# ---- g31 ---------------------------------------------------------------------
+# g31: ECDF overlays (full sample, y >= 0) in faceted panels make skew reduction
+# and tail compression easy to compare. Informs zero-inflation / hurdle probability.
+g31_transform_ecdf <- g31_transform_data %>%
   ggplot(aes(x = value)) +
   stat_ecdf(linewidth = 0.9, colour = "#005072") +
   facet_wrap(~ scale_label, scales = "free_x", ncol = 2) +
   labs(
-    title = "Modeled-outcome shape checks: transformation diagnostics for days_absent_chronic",
-    subtitle = "Comparing candidate scales after viewing the raw chronic-absence distribution and before model specification",
+    title = "g31: Transformation diagnostics for days_absent_chronic (full sample, y ≥ 0)",
+    subtitle = "Full analytic sample including zero chronic absences. Examines zero-inflation structure and tail behavior.",
     x = "Outcome value on candidate scale",
     y = "Empirical cumulative proportion",
-    caption = "Same respondents across panels. Lower apparent skew and compressed upper tail indicate easier Gaussian-style approximation for the modeled chronic-absence outcome."
+    caption = "Full sample perspective: evaluates zero mass (94.3%) and skew among all respondents. Lower skew and compressed upper tail suggest easier Gaussian approximation in the zero-inflation component."
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -1134,18 +1385,113 @@ g15_transform_ecdf <- g15_transform_data %>%
   )
 
 ggsave(
-  paste0(prints_folder, "g15_transform_ecdf.png"),
-  g15_transform_ecdf, width = 8.5, height = 5.5, dpi = 300
+  paste0(prints_folder, "g31_transform_ecdf.png"),
+  g31_transform_ecdf, width = 8.5, height = 5.5, dpi = 300
 )
-print(g15_transform_ecdf)
+print(g31_transform_ecdf)
 
-# ---- g16 ---------------------------------------------------------------------
+# ---- g32-data-prep -----------------------------------------------------------
+# Build long-form transformed variants of days_absent_chronic (positive part only, y > 0)
+# to assess Gaussian approximation among chronic reporters.
+g32_transform_data <- ds0 %>%
+  filter(days_absent_chronic > 0) %>%  # Focus on positive-part only
+  transmute(
+    y_raw   = days_absent_chronic,
+    y_sqrt  = sqrt(days_absent_chronic),
+    y_log1p = log1p(days_absent_chronic),
+    y_asinh = asinh(days_absent_chronic),
+    y_poslog = log(days_absent_chronic)  # Positive-part log (only valid for y > 0)
+  ) %>%
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "scale_id",
+    values_to = "value"
+  ) %>%
+  mutate(
+    scale_label = factor(
+      dplyr::recode(
+        scale_id,
+        y_raw = "Raw count (y)",
+        y_sqrt = "Square root: sqrt(y)",
+        y_log1p = "Log-shift: log1p(y)",
+        y_asinh = "IHS: asinh(y)",
+        y_poslog = "Log (positive-part): log(y)"
+      ),
+      levels = c(
+        "Raw count (y)",
+        "Square root: sqrt(y)",
+        "Log-shift: log1p(y)",
+        "IHS: asinh(y)",
+        "Log (positive-part): log(y)"
+      )
+    )
+  )
+
+g32_shape_summary <- g32_transform_data %>%
+  group_by(scale_label) %>%
+  summarise(
+    n_obs     = n(),
+    p90       = stats::quantile(value, probs = 0.90, na.rm = TRUE, names = FALSE),
+    p99       = stats::quantile(value, probs = 0.99, na.rm = TRUE, names = FALSE),
+    skewness  = skewness_estimate(value),
+    .groups = "drop"
+  )
+
+g32_shape_table <- g32_shape_summary %>%
+  mutate(
+    scale_label = as.character(scale_label),
+    n_obs = sprintf("%d", n_obs),
+    p90 = sprintf("%.2f", p90),
+    p99 = sprintf("%.2f", p99),
+    skewness = sprintf("%.2f", skewness)
+  )
+
+if (isTRUE(getOption("knitr.in.progress"))) {
+  knitr::kable(
+    g32_shape_table,
+    format = "html",
+    col.names = c("Scale", "N (y > 0)", "P90", "P99", "Skewness"),
+    align = c("l", "r", "r", "r", "r"),
+    caption = "g32 table: shape diagnostics (positive-part only) for days_absent_chronic across candidate scales"
+  )
+} else {
+  print(g32_shape_table)
+}
+
+# ---- g32 ---------------------------------------------------------------------
+# g32: ECDF overlays (positive part only, y > 0) in faceted panels.
+# Informs model specification for the conditional distribution among chronic reporters.
+g32_transform_ecdf <- g32_transform_data %>%
+  ggplot(aes(x = value)) +
+  stat_ecdf(linewidth = 0.9, colour = "#D55E00") +
+  facet_wrap(~ scale_label, scales = "free_x", ncol = 2) +
+  labs(
+    title = "g32: Transformation diagnostics for days_absent_chronic (positive part, y > 0)",
+    subtitle = "Chronic reporters only (n = 3,626). Assesses normality and tail behavior for positive-part model.",
+    x = "Outcome value on candidate scale",
+    y = "Empirical cumulative proportion",
+    caption = "Positive-part perspective: evaluates conditional distribution among those with ≥1 chronic-absence day. Reduced skew and compressed upper tail support Gaussian-based conditional model (e.g., log-link GLM or linear model on log scale)."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+ggsave(
+  paste0(prints_folder, "g32_transform_ecdf.png"),
+  g32_transform_ecdf, width = 8.5, height = 5.5, dpi = 300
+)
+print(g32_transform_ecdf)
+
+# ---- g33-data-prep -----------------------------------------------------------
 # Density vs fitted Gaussian overlay per transformation scale.
 # Shows how well each scale's empirical distribution matches a normal with the
 # same mean and SD — the better the match, the more its mean captures "typical"
 # and its SD captures "spread" in the intuitive, symmetric sense.
+# Computed for positive-part only (y > 0).
 
-g16_gauss_ref <- g15_transform_data %>%
+g33_gauss_ref <- g32_transform_data %>%
   group_by(scale_label) %>%
   summarise(
     mu = mean(value, na.rm = TRUE),
@@ -1153,52 +1499,7 @@ g16_gauss_ref <- g15_transform_data %>%
     .groups = "drop"
   )
 
-g16_density_vs_gaussian <- g15_transform_data %>%
-  ggplot(aes(x = value)) +
-  geom_density(
-    aes(colour = "Empirical density"),
-    linewidth = 0.9, key_glyph = "path"
-  ) +
-  geom_function(
-    data = g16_gauss_ref,
-    aes(colour = "Gaussian (same mean & SD)"),
-    fun = function(x) {
-      # placeholder — overridden per facet below
-      dnorm(x, mean = 0, sd = 1)
-    },
-    linewidth = 0.7, linetype = "dashed", key_glyph = "path",
-    # suppress — we draw manually per panel
-    show.legend = FALSE
-  ) +
-  # Instead use stat_function trick via pre-computed reference lines:
-  # We'll overlay gaussian ribbons via a helper tibble
-  facet_wrap(~ scale_label, scales = "free", ncol = 2) +
-  scale_colour_manual(
-    values = c("Empirical density" = "#005072", "Gaussian (same mean & SD)" = "#D55E00"),
-    name = NULL
-  ) +
-  labs(
-    title = "Why reduced skew matters for days_absent_chronic",
-    subtitle = paste0(
-      "When the blue curve matches the dashed orange curve, the mean and SD\n",
-      "fully characterize the distribution \u2014 every summary statistic behaves as expected"
-    ),
-    x = "Outcome value on candidate scale",
-    y = "Density",
-    caption = paste0(
-      "Orange dashed = N(mean, SD) fitted to each panel's data. ",
-      "Better overlap \u2192 mean is a trustworthy 'typical value' and SD is a symmetric spread measure."
-    )
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    strip.text = element_text(face = "bold"),
-    legend.position = "bottom",
-    panel.grid.minor = element_blank()
-  )
-
-# Rebuild with manual Gaussian curves per facet using a generated reference grid
-g16_gauss_curve <- g16_gauss_ref %>%
+g33_gauss_curve <- g33_gauss_ref %>%
   rowwise() %>%
   mutate(
     x_grid = list(seq(mu - 4 * sigma, mu + 4 * sigma, length.out = 300)),
@@ -1207,33 +1508,34 @@ g16_gauss_curve <- g16_gauss_ref %>%
   unnest(cols = c(x_grid, y_grid)) %>%
   ungroup()
 
-g16_density_vs_gaussian <- g15_transform_data %>%
+# ---- g33 ---------------------------------------------------------------------
+g33_density_vs_gaussian <- g32_transform_data %>%
   ggplot(aes(x = value)) +
   geom_density(
     aes(colour = "Empirical density"),
     linewidth = 0.9, key_glyph = "path"
   ) +
   geom_line(
-    data = g16_gauss_curve,
+    data = g33_gauss_curve,
     aes(x = x_grid, y = y_grid, colour = "Gaussian (same mean & SD)"),
     linewidth = 0.7, linetype = "dashed", key_glyph = "path"
   ) +
   facet_wrap(~ scale_label, scales = "free", ncol = 2) +
   scale_colour_manual(
-    values = c("Empirical density" = "#005072", "Gaussian (same mean & SD)" = "#D55E00"),
+    values = c("Empirical density" = "#D55E00", "Gaussian (same mean & SD)" = "#005072"),
     name = NULL
   ) +
   labs(
-    title = "Why reduced skew matters for days_absent_chronic",
+    title = "g33: Why reduced skew matters for positive-part modeling (y > 0)",
     subtitle = paste0(
-      "When the blue curve matches the dashed orange curve, the mean and SD\n",
-      "fully characterize the distribution \u2014 every summary statistic behaves as expected"
+      "Chronic reporters only. When orange curve matches blue dashed curve, the mean and SD\n",
+      "fully characterize the conditional distribution -- each transformation's behavior is predictable."
     ),
     x = "Outcome value on candidate scale",
     y = "Density",
     caption = paste0(
-      "Orange dashed = N(mean, SD) fitted to each panel's data. ",
-      "Better overlap \u2192 mean is a trustworthy 'typical value' and SD is a symmetric spread measure."
+      "Blue dashed = N(mean, SD) fitted to positive-part data. ",
+      "Better overlap = mean/SD statistics are trustworthy for conditional modeling. Informs choice of log-link or power transformation."
     )
   ) +
   theme_minimal(base_size = 11) +
@@ -1244,10 +1546,10 @@ g16_density_vs_gaussian <- g15_transform_data %>%
   )
 
 ggsave(
-  paste0(prints_folder, "g16_density_vs_gaussian.png"),
-  g16_density_vs_gaussian, width = 8.5, height = 5.5, dpi = 300
+  paste0(prints_folder, "g33_density_vs_gaussian.png"),
+  g33_density_vs_gaussian, width = 8.5, height = 5.5, dpi = 300
 )
-print(g16_density_vs_gaussian)
+print(g33_density_vs_gaussian)
 
 
 # =============================================================================

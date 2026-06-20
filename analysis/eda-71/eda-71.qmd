@@ -299,6 +299,12 @@ This section now has a two-part layout in both G2 and G21:
 1.  **Left, narrow panel**: one 100% stacked bar partitioning the full analytic sample into three mutually exclusive groups.
 2.  **Right, wide panel**: the exact chronic-day distribution among respondents who reported at least one chronic-absence day.
 
+Definitions for the three left-panel subcomponents (these add to 63,843):
+
+1.  **No missed days**: `days_absent_total == 0`.
+2.  **≥1 chronic day**: `days_absent_chronic > 0` (includes people who may also report non-chronic days).
+3.  **Other-only missed day**: `days_absent_chronic == 0 & days_absent_total > 0`.
+
 Keep the denominators straight:
 
 1.  In the left raw bar, the three segment counts add to the analytic sample size, 63,843.
@@ -334,9 +340,57 @@ Keep the denominators straight:
 #| fig-cap: "G21: Composite weighted view of the same chronic-absence outcome. Left: the full employed-worker population is partitioned into the same three mutually exclusive groups, now using pooled survey weights so the bar sums to 100%. Right: among chronic reporters only, each exact positive chronic-day value is shown as a weighted share of that chronic-reporter subpopulation, again using the G01 day-range color logic. This makes the positive-tail shape readable after the overall prevalence split has already been shown on the left."
 ```
 
-## Modeled-Outcome Shape Checks — days_absent_chronic
+```{r}
+#| label: g22-data-prep
+#| code-summary: Prepare non-chronic-day distribution within the same chronic-reporter cohort (n = 3,626)
+#| echo: false
+#| cache: true
+#| results: markup
+```
 
-Now that G2 has shown the raw and weighted empirical distribution of `days_absent_chronic`, we can ask the next question: which outcome scale best regularizes the positive tail for diagnostics and moment-based summaries?
+```{r}
+#| label: compose_three_panel_grob
+#| code-summary: Helper function to compose three-panel grob with left spanning column and right split vertically
+#| echo: false
+#| cache: true
+#| results: hide
+```
+
+```{r}
+#| label: g22 - top-right (chronic days)
+#| code-summary: Prepare top-right chronic-day distribution plot for g22
+#| echo: false
+#| cache: true
+#| results: hide
+```
+
+```{r}
+#| label: g22 - bottom-right (other-reason days)
+#| code-summary: Prepare bottom-right other-reason-day distribution plot for g22
+#| echo: false
+#| cache: true
+#| results: hide
+```
+
+```{r}
+#| label: g22
+#| code-summary: "g22: Split right panel — top shows chronic-day distribution; bottom shows non-chronic days for the same 3,626 chronic reporters"
+#| echo: false
+#| cache: false
+#| fig-width: 8.5
+#| fig-height: 7
+#| fig-cap: "G22: Composite raw split view extending G2. Left: the same 100% stacked partition of all 63,843 analytic respondents into no missed days, ≥1 chronic day, and other-only missed days. Right-top: exact chronic-day distribution for chronic reporters (n = 3,626), preserving the G01 day-range color logic. Right-bottom: for that same chronic-reporter cohort (n = 3,626), the distribution of non-chronic missed days, computed as days_absent_total minus days_absent_chronic. This separates cohort composition (left) from within-cohort chronic vs non-chronic day-count structure (right)."
+```
+
+## G3 Family — Modeled-Outcome Shape Checks for days_absent_chronic
+
+**Two-part modeling rationale**: The chronic-absence outcome has two inherent structures:
+- **Full distribution** (y ≥ 0): includes zero mass and positive-tail shape; informs zero-inflation / hurdle probability component
+- **Positive-part only** (y > 0): among chronic reporters; informs conditional count/duration component
+
+This section builds diagnostic graphs for both perspectives.
+
+Now that G2 has shown the raw and weighted empirical distribution of `days_absent_chronic`, we can ask the next question: which outcome scale best regularizes each component for diagnostics and moment-based summaries?
 
 This section separates two linked issues:
 
@@ -353,21 +407,43 @@ The table below states the modeling assumptions for each candidate scale. Then w
 ```
 
 ```{r}
-#| label: g15-data-prep
-#| code-summary: Create transformed days_absent_chronic variants and summarize zero-mass, quantiles, and skewness
+#| label: g31-data-prep
+#| code-summary: Create transformed days_absent_chronic variants (full sample, y ≥ 0) and summarize zero-mass, quantiles, and skewness
 #| echo: false
 #| cache: true
 #| results: markup
 ```
 
 ```{r}
-#| label: g15
-#| code-summary: ECDF comparison of raw, sqrt, log1p, and IHS scales for days_absent_chronic
+#| label: g31
+#| code-summary: "g31: ECDF comparison of raw, sqrt, log1p, and IHS scales for days_absent_chronic (full sample including zeros)"
 #| echo: false
 #| cache: true
 #| fig-width: 8.5
 #| fig-height: 5.5
-#| fig-cap: "Modeled-outcome diagnostic: the raw chronic-absence scale retains pronounced right-tail behavior, while sqrt, log1p, and IHS progressively compress the upper tail. G2 already established the empirical zero mass; these panels focus on how the positive tail would behave under alternative scales for diagnostics, residual checks, and moment-based summaries."
+#| fig-cap: "g31: Full-sample ECDF diagnostic. The raw chronic-absence scale retains pronounced right-tail behavior and 94.3% zero mass; sqrt, log1p, and IHS progressively compress both. Focus here is on the zero-inflation component: understanding the cumulative structure of the full sample before the positive-part-only checks below."
+```
+
+## g32 — Shape Diagnostics for Positive-Part Model
+
+Among the 3,626 chronic reporters (5.7% of 63,843), the conditional distribution of `days_absent_chronic | y > 0` has its own shape signature. This is the outcome that drives the count-process parameters in a two-part / hurdle / zero-inflated model. The g32 graphs below focus on *only* the positive-part data and ask: which scale best compresses the conditional tail?
+
+```{r}
+#| label: g32-data-prep
+#| code-summary: g32 data prep — Create transformed days_absent_chronic variants for positive-part only (y > 0) and summarize quantiles and skewness
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g32
+#| code-summary: "g32: ECDF comparison of raw, sqrt, log1p, IHS, and log scales for days_absent_chronic (positive-part only, y > 0)"
+#| echo: false
+#| cache: true
+#| fig-width: 8.5
+#| fig-height: 5.5
+#| fig-cap: "g32: Positive-part-only ECDF diagnostic (chronic reporters, n=3,626). This perspective focuses on conditional shape — how the day counts distribute *among those at risk*. The positive-part log transformation becomes available here (it's not defined for zero). Notice how the conditional tail is less extreme than the full-sample view in g31: without the 94.3% zero mass dominating, the positive values show less right-skew. This informs the choice of count model: if log-transformed values approximate normality, a log-link Poisson/NB or linear model on log scale is appropriate."
 ```
 
 ### Why Gaussian Approximation Matters for Moments
@@ -385,14 +461,26 @@ A Gaussian (normal) distribution is the **reference case** where moments are max
 
 The graph below overlays the empirical density (blue) against a Gaussian with the *same* mean and SD (dashed orange) for each candidate scale. Where the two curves diverge, the moments are "lying" — summarizing a shape they don't actually describe. Where they overlap, the moments are trustworthy descriptors for the chronic-absence outcome.
 
+## g33 — Gaussian Fit: Conditional Distribution Assessment
+
+The graph below overlays the empirical density (orange) against a Gaussian with the *same* mean and SD (blue dashed) for each candidate scale, using only the positive-part data. Where the two curves diverge, the moments are "lying" — summarizing a shape they don't actually describe. Where they overlap, the moments are trustworthy descriptors for the conditional chronic-absence outcome among reporters.
+
 ```{r}
-#| label: g16
-#| code-summary: Empirical density vs fitted Gaussian — visual test of moment interpretability per scale
+#| label: g33-data-prep
+#| code-summary: g33 data prep — Compute Gaussian reference curves for positive-part transformed scales
+#| echo: false
+#| cache: true
+#| results: markup
+```
+
+```{r}
+#| label: g33
+#| code-summary: "g33: Empirical density vs fitted Gaussian — visual test of moment interpretability for positive-part transformations"
 #| echo: false
 #| cache: true
 #| fig-width: 8.5
 #| fig-height: 5.5
-#| fig-cap: "Density vs. Gaussian overlay: on the raw scale the empirical density (blue) diverges sharply from the fitted normal (orange dashed) — the mean overstates 'typical' and SD conflates the zero-mass spike with the long tail. Under sqrt, log1p, and especially IHS, the curves converge, signaling that the mean and SD become progressively more honest summaries of location and spread. This is why transformation matters even when we ultimately model counts: diagnostic checks, residual analysis, and effect-size interpretation all improve when the conditional distribution approximates normality."
+#| fig-cap: "g33: Density vs. Gaussian overlay (positive-part only, chronic reporters n=3,626). The blue dashed curve is N(mean, SD) fitted to each scale's positive-part data. On the raw scale, the empirical density (orange) diverges from normal, but sqrt, log1p, IHS, and especially log (positive-part log) bring the curves into alignment. This supports the use of log-link models or log-transformed analyses for the conditional chronic-absence count: the mean and SD on the log scale become trustworthy summaries of location and spread for effect-size interpretation and confidence intervals."
 ```
 
 ### Why Zero-Inflated Negative Binomial (ZINB)?
