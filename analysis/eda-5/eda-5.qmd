@@ -22,50 +22,33 @@ editor_options:
 
 # Mission
 
-This EDA opens the "black box" of `days_absent_total` by examining the 8 individual LOP
-reason categories from which it is constructed. It directly addresses:
+This EDA opens the "black box" of `days_absent_total` by examining the 8 individual LOP reason categories from which it is constructed. It directly addresses:
 
-- **Section 4.1** — Outcome variable construction: prevalence of each reason, relative
-  contribution to the overall burden, co-occurrence patterns across reason pairs, and a
-  data-quality validation confirming that zeros are preserved (not stored as `NA`) after
-  the element-wise exclusion step.
-- **Section 4.2** — Distributional statistics for the primary outcome: zero inflation
-  fraction, frequency distribution shape, conditional intensity among reporters, and the
-  structural role of the chronic-condition component.
+-   **Section 4.1** — Outcome variable construction: prevalence of each reason, relative contribution to the overall burden, co-occurrence patterns across reason pairs, and a data-quality validation confirming that zeros are preserved (not stored as `NA`) after the element-wise exclusion step.
+-   **Section 4.2** — Distributional statistics for the primary outcome: zero inflation fraction, frequency distribution shape, conditional intensity among reporters, and the structural role of the chronic-condition component.
 
 **Research Questions:**
 
-1. What is the weighted prevalence of each of the 8 LOP reason categories?
-2. How much does each LOP component contribute to the weighted mean of `days_absent_total`?
-3. How many reason categories does a typical respondent report simultaneously, and which
-   pairs most frequently co-occur?
-4. Among reporters of a given reason, how many days does that reason typically produce?
-5. What structural role does the chronic-condition component play among absent workers?
-6. Are all 8 LOP components complete in the analytical sample, validating the element-wise
-   exclusion step that removed 405 respondents upstream?
+1.  What is the weighted prevalence of each of the 8 LOP reason categories?
+2.  How much does each LOP component contribute to the weighted mean of `days_absent_total`?
+3.  How many reason categories does a typical respondent report simultaneously, and which pairs most frequently co-occur?
+4.  Among reporters of a given reason, how many days does that reason typically produce?
+5.  What structural role does the chronic-condition component play among absent workers?
+6.  Are all 8 LOP components complete in the analytical sample, validating the element-wise exclusion step that removed 405 respondents upstream?
 
-> **Bootstrap weights note**: Confidence intervals via bootstrap are not available for
-> CCHS 2010 and 2014 PUMF cycles. Variance estimates rely on the pooled master weight
-> (`wts_m_pooled`) only. This is a known limitation documented in the CACHE manifest and
-> confirmed in the 2026-05-15 review session with Marc-André Blanchette.
+> **Bootstrap weights note**: Confidence intervals via bootstrap are not available for CCHS 2010 and 2014 PUMF cycles. Variance estimates rely on the pooled master weight (`wts_m_pooled`) only. This is a known limitation documented in the CACHE manifest and confirmed in the 2026-05-15 review session with Marc-André Blanchette.
 
-Following the dual-file development pattern, all analytical code lives in
-`analysis/eda-5/eda-5.R`. This document sources those chunks for presentation.
+Following the dual-file development pattern, all analytical code lives in `analysis/eda-5/eda-5.R`. This document sources those chunks for presentation.
 
 # Definition of Terms
 
-**LOP module**: Loss of Productivity module from the CCHS. Respondents are asked how many
-workdays they missed in the past 3 months due to each of 8 distinct health-related reasons.
+**LOP module**: Loss of Productivity module from the CCHS. Respondents are asked how many workdays they missed in the past 3 months due to each of 8 distinct health-related reasons.
 
-**`days_absent_total`**: The primary outcome. Row-wise sum of all 8 LOP component
-variables (`lopg040` + `lopg070` + `lopg082`–`lopg086` + `lopg100`), capped at 90 days.
+**`days_absent_total`**: The primary outcome. Row-wise sum of all 8 LOP component variables (`lopg040` + `lopg070` + `lopg082`–`lopg086` + `lopg100`), capped at 90 days.
 
-**`days_absent_chronic`**: The sensitivity outcome. Days missed due to chronic condition
-only (`lopg040`), capped at 90 days.
+**`days_absent_chronic`**: The sensitivity outcome. Days missed due to chronic condition only (`lopg040`), capped at 90 days.
 
-**Element-wise exclusion**: 405 respondents with any missing value across the 8 LOP
-components were excluded at Ellis pipeline step 4 (see CACHE manifest). In the analytical
-sample the zero response is preserved as a valid integer value, not stored as `NA`.
+**Element-wise exclusion**: 405 respondents with any missing value across the 8 LOP components were excluded at Ellis pipeline step 4 (see CACHE manifest). In the analytical sample the zero response is preserved as a valid integer value, not stored as `NA`.
 
 **LOP reason categories (8 components):**
 
@@ -153,8 +136,7 @@ read_chunk("analysis/eda-5/eda-5.R")
 
 # Data Context
 
-For complete data documentation, see the
-[Data Primer](../data-primer-1/univariate-distributions.html).
+For complete data documentation, see the [Data Primer](../data-primer-1/univariate-distributions.html).
 
 ```{r}
 #| label: data-context-tables
@@ -182,15 +164,14 @@ For complete data documentation, see the
 #| code-summary: Reshape to long-form LOP dataset (shared ancestor for G1–G6)
 #| echo: true
 #| cache: true
-#| results: hide
+#| results: show
 ```
 
 # Analysis
 
 ## G0 — Outcome Distribution Orientation
 
-**Framing question**: How does absence distribute across the analytical sample — and
-among those who missed at least one day, what does the day-count distribution look like?
+**Framing question**: How does absence distribute across the analytical sample — and among those who missed at least one day, what does the day-count distribution look like?
 
 ```{r}
 #| label: g0-data-prep
@@ -200,6 +181,8 @@ among those who missed at least one day, what does the day-count distribution lo
 #| results: show
 ```
 
+### G0 - Zero Split
+
 ```{r}
 #| label: g0
 #| code-summary: G0 — Horizontal stacked bar, zero vs ≥1 absent day
@@ -207,7 +190,7 @@ among those who missed at least one day, what does the day-count distribution lo
 #| cache: true
 #| fig-width: 10
 #| fig-height: 3
-#| fig-cap: "G0: The analytical sample splits approximately 70/30 between workers with no missed days and those with ≥1 missed day — consistent with the zero-inflated structure described in Kermiche et al. (2025) and confirmed in the 2026-05-15 review session."
+#| fig-cap: "G0: The analytical sample splits approximately 70/30 between workers with no missed days and those with ≥1 missed day — consistent with the zero-inflated structure described in Kermiche et al. (2025) and confirmed in the 2026-05-15 review session. Sample size used for plotting: n = 63,843 respondents."
 print(g0_lop_zero_vs_nonzero)
 ```
 
@@ -219,6 +202,8 @@ print(g0_lop_zero_vs_nonzero)
 #| results: show
 ```
 
+### G01 - Total Histogram
+
 ```{r}
 #| label: g01
 #| code-summary: G01 — Histogram of total missed days, coloured by day-range band
@@ -226,7 +211,7 @@ print(g0_lop_zero_vs_nonzero)
 #| cache: true
 #| fig-width: 10
 #| fig-height: 5
-#| fig-cap: "G01: Frequency histogram for respondents with ≥1 missed day. The heavy concentration at 1–5 days and a long right tail (up to 63 days) characterise the right-skewed count distribution. Bar colours link to the same day-range bands as G02."
+#| fig-cap: "G01: Frequency histogram for respondents with ≥1 missed day. The heavy concentration at 1–5 days and a long right tail (up to 63 days) characterise the right-skewed count distribution. Bar colours link to the same day-range bands as G02. Sample size used for plotting: n = 18,837 respondent records."
 print(g01_lop_days_histogram)
 ```
 
@@ -238,21 +223,82 @@ print(g01_lop_days_histogram)
 #| results: show
 ```
 
+### G02 - Day-Range Mix
+
 ```{r}
 #| label: g02
 #| code-summary: G02 — Horizontal stacked bar, day-range breakdown
 #| echo: true
-#| cache: false
+#| cache: true
 #| fig-width: 10
 #| fig-height: 4
-#| fig-cap: "G02: Among workers who missed ≥1 day, the majority fall in the short-absence bands (1–5 days). The proportion with ≥6 days is smaller but non-trivial and driven substantially by chronic conditions."
+#| fig-cap: "G02: Among workers who missed ≥1 day, the majority fall in the short-absence bands (1–5 days). The proportion with ≥6 days is smaller but non-trivial and driven substantially by chronic conditions. Sample size used for plotting: n = 18,837 respondent records."
 print(g02_lop_day_ranges)
+```
+
+```{r}
+#| label: g03-data-prep
+#| code-summary: For each reason, bin days into ranges; add Total facet
+#| echo: true
+#| cache: true
+#| results: show
+```
+
+### G03 - Reason Facets
+
+```{r}
+#| label: g03
+#| code-summary: G03 — Faceted histograms of days absent by LOP reason + Total
+#| echo: true
+#| cache: false
+#| fig-width: 12
+#| fig-height: 9
+#| fig-cap: "G03: Frequency histograms for each of the 8 LOP reasons, showing the distribution of days absent specifically for that reason among respondents with ≥1 day for that reason. The Total facet (bottom right) replicates G01, showing the combined distribution. Chronic condition and other health conditions dominate the tail; cold and flu show sharp peaks at 1–5 days. Sample size used for plotting: n = 41,293 plotted records (22,456 reason-specific + 18,837 total-facet records)."
+print(g03_lop_days_faceted)
+```
+
+### G04 - Free Scales
+
+```{r}
+#| label: g04
+#| code-summary: G04 — Faceted histograms with free x and y axes per reason
+#| echo: true
+#| cache: false
+#| fig-width: 12
+#| fig-height: 9
+#| fig-cap: "G04: Same faceted histograms as G03 but with independent x and y scales per facet. This removes shared-scale compression and reveals the true distribution shape for each reason — particularly useful for detecting multimodality or skew within low-count reasons like respiratory infection. The free axes highlight why chronic condition shows such a distinctive long tail. Sample size used for plotting: n = 41,293 plotted records (22,456 reason-specific + 18,837 total-facet records)."
+print(g04_lop_days_faceted_free)
+```
+
+### G05 - Fixed Axes
+
+```{r}
+#| label: g05
+#| code-summary: G05 - Reason-only facets, x fixed to 31 days and y fixed to observed max
+#| echo: true
+#| cache: false
+#| fig-width: 12
+#| fig-height: 9
+#| fig-cap: "G05: Reason-specific frequency histograms only (Total facet removed), with x-axis fixed to 1-31 days and a shared y-axis fixed to the observed maximum count across displayed bins. This keeps panel comparability while focusing on the short-to-mid absence range. Plotting unit is reason-level records (reason x respondent): n = 22,456 records. Respondents with multiple reasons can appear in more than one facet."
+print(g05_lop_days_faceted_x31)
+```
+
+### G06 - Weighted Burden
+
+```{r}
+#| label: g06
+#| code-summary: G06 - Same structure as G05, y shows weighted days contributed by bin
+#| echo: true
+#| cache: false
+#| fig-width: 12
+#| fig-height: 9
+#| fig-cap: "G06: Same faceted structure as G05, but y now represents weighted days contributed by each bin (sum of survey weight × days in bin), not respondent counts. X remains fixed to 1-31 days and y is fixed to the observed weighted maximum across facets. Plotting unit is reason-level records (reason x respondent): n = 22,456 records. Respondents with multiple reasons can appear in more than one facet."
+print(g06_lop_weighted_days_faceted_x31)
 ```
 
 ## G1 — Prevalence of Each LOP Reason Category
 
-**Framing question**: What proportion of workers in the analytical sample missed ≥1
-workday for each of the 8 reason categories?
+**Framing question**: What proportion of workers in the analytical sample missed ≥1 workday for each of the 8 reason categories?
 
 ```{r}
 #| label: g1-data-prep
@@ -286,8 +332,7 @@ print(g11_lop_prevalence_by_cycle)
 
 ## G2 — Component Contribution to the Total Outcome
 
-**Framing question**: How much does each LOP reason contribute — in absolute days and
-relative share — to the weighted mean of `days_absent_total`?
+**Framing question**: How much does each LOP reason contribute — in absolute days and relative share — to the weighted mean of `days_absent_total`?
 
 ```{r}
 #| label: g2-data-prep
@@ -321,8 +366,7 @@ print(g21_lop_contribution_stacked)
 
 ## G3 — Co-occurrence of Reason Categories
 
-**Framing question**: How many reason categories does a typical respondent report
-simultaneously, and which reason pairs most frequently co-occur?
+**Framing question**: How many reason categories does a typical respondent report simultaneously, and which reason pairs most frequently co-occur?
 
 ```{r}
 #| label: g3-data-prep
@@ -356,8 +400,7 @@ print(g31_lop_cooccurrence)
 
 ## G4 — Conditional Intensity Among Reporters
 
-**Framing question**: Among workers who missed ≥1 day *for a specific reason*, how many
-days did that reason typically produce?
+**Framing question**: Among workers who missed ≥1 day *for a specific reason*, how many days did that reason typically produce?
 
 ```{r}
 #| label: g4-data-prep
@@ -391,9 +434,7 @@ print(g41_total_distribution)
 
 ## G5 — Chronic Condition's Structural Role
 
-**Framing question**: Among workers who missed at least one day, how central is the
-chronic-condition component? Are most absent workers absent *only* for chronic reasons,
-or is the absence mixed?
+**Framing question**: Among workers who missed at least one day, how central is the chronic-condition component? Are most absent workers absent *only* for chronic reasons, or is the absence mixed?
 
 ```{r}
 #| label: g5-data-prep
@@ -427,17 +468,9 @@ print(g51_chronic_vs_total)
 
 ## G6 — LOP Component Availability (Data Quality Validation)
 
-**Framing question**: Are all 8 LOP components complete in the analytical sample,
-confirming that zeros are preserved as valid responses and that the element-wise
-exclusion upstream resolved all missingness?
+**Framing question**: Are all 8 LOP components complete in the analytical sample, confirming that zeros are preserved as valid responses and that the element-wise exclusion upstream resolved all missingness?
 
-> **Context (Marc-André, 2026-05-15)**: A concern was raised that element-wise
-> exclusion — dropping a respondent if *any* LOP component is missing — could
-> unnecessarily reduce the sample if missingness is rare and non-systematic.
-> The CACHE manifest confirms that 405 respondents were excluded at Ellis step 4
-> (out of 64,248 employed respondents: a ~0.6% loss). G6 validates that the
-> 63,843 retained rows have *no* missing values on any LOP component, and that
-> zero is correctly encoded as an integer rather than `NA`.
+> **Context (Marc-André, 2026-05-15)**: A concern was raised that element-wise exclusion — dropping a respondent if *any* LOP component is missing — could unnecessarily reduce the sample if missingness is rare and non-systematic. The CACHE manifest confirms that 405 respondents were excluded at Ellis step 4 (out of 64,248 employed respondents: a \~0.6% loss). G6 validates that the 63,843 retained rows have *no* missing values on any LOP component, and that zero is correctly encoded as an integer rather than `NA`.
 
 ```{r}
 #| label: g6-data-prep

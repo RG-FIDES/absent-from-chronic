@@ -179,15 +179,12 @@ ds_lop_long <- ds0 %>%
     reason_label = factor(reason_label, levels = lop_components),
     has_days     = !is.na(days_reason) & days_reason > 0
   )
-
-
-# =============================================================================
-# G0 FAMILY — Outcome Distribution Orientation
+# let's save ds_lop_long as a parquet for potential reuse in later analyses
+# arrow::write_parquet(ds_lop_long, file.path(data_private_derived, "ds_lop_long.parquet"))
+ds_lop_long %>% glimpse()
+# ---- SECTION: G0 Family - Outcome Distribution --------------------------------
 # Framing question: How does absence distribute across the analytical sample?
-# g0  : zero vs non-zero split (horizontal stacked bar)
-# g01 : histogram of total missed days among the ≥1-day group, coloured by day range
-# g02 : day-range breakdown stacked bar for the ≥1-day group
-# =============================================================================
+# g0: zero vs non-zero split | g01: total histogram | g02: day-range bar
 
 # ---- g0-data-prep ------------------------------------------------------------
 g0_data <- ds0 %>%
@@ -401,13 +398,297 @@ ggsave(paste0(prints_folder, "g02_lop_day_ranges.png"),
        g02_lop_day_ranges, width = 10, height = 4, dpi = 300)
 print(g02_lop_day_ranges)
 
+# ---- g03-data-prep -----------------------------------------------------------
+# Faceted histograms by reason: for each LOP component, show distribution of
+# days_reason among those with ≥1 day for that reason. Includes "Total" facet.
 
-# =============================================================================
-# G1 FAMILY — Prevalence of Each LOP Reason Category
-# Framing question: What proportion of workers missed ≥1 workday for each reason?
-# g1  : weighted prevalence, ordered horizontal bar
-# g11 : prevalence by survey cycle (2010-2011 vs 2013-2014)
-# =============================================================================
+# Helper function: bin days into day_range categories
+assign_day_range <- function(days) {
+  dplyr::case_when(
+    days == 1  ~ "1 day",
+    days == 2  ~ "2 days",
+    days == 3  ~ "3 days",
+    days == 4  ~ "4 days",
+    days == 5  ~ "5 days",
+    days <= 10 ~ "6\u201310 days",
+    days <= 15 ~ "11\u201315 days",
+    days <= 30 ~ "16\u201330 days",
+    TRUE       ~ "31+ days"
+  )
+}
+
+# Data for each reason: days_reason distribution among those with ≥1 day for that reason
+g03_reason_data <- ds_lop_long %>%
+  filter(has_days) %>%
+  mutate(
+    day_range = factor(assign_day_range(days_reason), levels = day_range_levels)
+  ) %>%
+  group_by(reason_label, days_reason, day_range) %>%
+  summarise(n = n(), .groups = "drop")
+
+# Add "Total" facet using days_absent_total for those with ≥1 day
+g03_total_data <- ds_nonzero %>%
+  mutate(
+    reason_label = "Total (all reasons)",
+    days_reason  = days_absent_total
+  ) %>%
+  group_by(reason_label, days_reason, day_range) %>%
+  summarise(n = n(), .groups = "drop")
+
+# Combine and ensure consistent ordering
+g03_faceted_data <- bind_rows(g03_reason_data, g03_total_data) %>%
+  mutate(
+    reason_label = factor(
+      reason_label,
+      levels = c(lop_components, "Total (all reasons)")
+    )
+  )
+
+# Facet-strip labels with per-reason positive sample size (continuity with table)
+facet_n_lookup <- data_context_distributions %>%
+  transmute(
+    reason_label = as.character(reason_label),
+    n_positive = n_positive
+  ) %>%
+  bind_rows(
+    tibble::tibble(
+      reason_label = "Total (all reasons)",
+      n_positive = nrow(ds_nonzero)
+    )
+  )
+
+facet_label_map_all <- setNames(
+  paste0(
+    facet_n_lookup$reason_label,
+    "\nN = ",
+    scales::comma(facet_n_lookup$n_positive)
+  ),
+  facet_n_lookup$reason_label
+)
+
+facet_label_map_reasons <- facet_label_map_all[unname(lop_components)]
+
+# ---- g03 ---------------------------------------------------------------------
+# Faceted histograms: frequency of days absent by reason + total
+
+g03_lop_days_faceted <- g03_faceted_data %>%
+  ggplot(aes(x = days_reason, y = n, fill = day_range)) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  facet_wrap(
+    ~ reason_label,
+    nrow = 3,
+    ncol = 3,
+    scales = "free_y",
+    labeller = as_labeller(facet_label_map_all)
+  ) +
+  scale_x_continuous(
+    breaks = c(1, 10, 20, 30, 40, 50),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  scale_fill_manual(values = day_range_colours) +
+  labs(
+    title    = "G03 (\u00a74.2): Frequency distribution of days absent by LOP reason",
+    subtitle = "Respondents with \u22651 day absent per reason; total facet shows all reasons combined",
+    x        = "Days absent (reason-specific for facets 1–8, combined for Total)",
+    y        = "Number of respondents",
+    fill     = "Day range",
+    caption  = "Source: CCHS 2010\u201311 & 2013\u201314 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+ggsave(paste0(prints_folder, "g03_lop_days_faceted.png"),
+       g03_lop_days_faceted, width = 12, height = 9, dpi = 300)
+print(g03_lop_days_faceted)
+
+# ---- g04 ---------------------------------------------------------------------
+# Faceted histograms with FREE x and y axes: allows each reason facet to have
+# its own scale, revealing distribution shape without shared-axis compression
+
+g04_lop_days_faceted_free <- g03_faceted_data %>%
+  ggplot(aes(x = days_reason, y = n, fill = day_range)) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  facet_wrap(
+    ~ reason_label,
+    nrow = 3,
+    ncol = 3,
+    scales = "free",
+    labeller = as_labeller(facet_label_map_all)
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  scale_fill_manual(values = day_range_colours) +
+  labs(
+    title    = "G04 (\u00a74.2): Frequency distribution of days absent by LOP reason (free axes)",
+    subtitle = "Respondents with \u22651 day absent per reason; each facet has independent x and y scales",
+    x        = "Days absent (reason-specific for facets 1–8, combined for Total)",
+    y        = "Number of respondents",
+    fill     = "Day range",
+    caption  = "Source: CCHS 2010\u201311 & 2013\u201314 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+ggsave(paste0(prints_folder, "g04_lop_days_faceted_free.png"),
+       g04_lop_days_faceted_free, width = 12, height = 9, dpi = 300)
+print(g04_lop_days_faceted_free)
+
+# ---- g05 ---------------------------------------------------------------------
+# Faceted histograms by reason only (no Total facet), with fixed axis ranges:
+# x-axis constrained to 1-31 days and y-axis fixed to the observed maximum.
+
+g05_faceted_data <- g03_reason_data %>%
+  filter(days_reason <= 31) %>%
+  mutate(
+    reason_label = factor(reason_label, levels = lop_components)
+  )
+
+# g05/g06 use x <= 31; show both plotted N and full positive N in strip labels.
+g05g06_strip_counts <- g03_reason_data %>%
+  mutate(
+    reason_label = as.character(reason_label),
+    in_plot = days_reason <= 31
+  ) %>%
+  group_by(reason_label) %>%
+  summarise(
+    n_positive_total = sum(n),
+    n_plotted = sum(n[in_plot]),
+    .groups = "drop"
+  )
+
+facet_label_map_g05g06 <- setNames(
+  ifelse(
+    g05g06_strip_counts$n_plotted == g05g06_strip_counts$n_positive_total,
+    paste0(
+      g05g06_strip_counts$reason_label,
+      "\nN = ", scales::comma(g05g06_strip_counts$n_plotted)
+    ),
+    paste0(
+      g05g06_strip_counts$reason_label,
+      "\nN <= 31d: ", scales::comma(g05g06_strip_counts$n_plotted),
+      " (N+ = ", scales::comma(g05g06_strip_counts$n_positive_total), ")"
+    )
+  ),
+  g05g06_strip_counts$reason_label
+)
+
+g05_y_max <- max(g05_faceted_data$n, na.rm = TRUE)
+
+g05_lop_days_faceted_x31 <- g05_faceted_data %>%
+  ggplot(aes(x = days_reason, y = n, fill = day_range)) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  facet_wrap(
+    ~ reason_label,
+    nrow = 3,
+    ncol = 3,
+    labeller = as_labeller(facet_label_map_g05g06)
+  ) +
+  scale_x_continuous(
+    limits = c(1, 31),
+    breaks = c(1, 5, 10, 15, 20, 25, 31),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    limits = c(0, g05_y_max),
+    labels = scales::label_comma(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  scale_fill_manual(values = day_range_colours) +
+  labs(
+    title    = "G05 (\u00a74.2): Reason-specific frequency distribution of days absent (x <= 31)",
+    subtitle = "Respondents with \u22651 day absent per reason; Total facet removed; fixed x and y ranges",
+    x        = "Days absent (reason-specific; capped at 31)",
+    y        = "Number of respondents",
+    fill     = "Day range",
+    caption  = "Source: CCHS 2010\u201311 & 2013\u201314 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+ggsave(paste0(prints_folder, "g05_lop_days_faceted_x31.png"),
+       g05_lop_days_faceted_x31, width = 12, height = 9, dpi = 300)
+print(g05_lop_days_faceted_x31)
+
+# ---- g06 ---------------------------------------------------------------------
+# Same facet structure as g05, but y-axis represents weighted days contributed
+# by each day-count bin: sum(weight * days_reason).
+
+g06_faceted_data <- ds_lop_long %>%
+  filter(has_days, days_reason <= 31) %>%
+  mutate(
+    day_range     = factor(assign_day_range(days_reason), levels = day_range_levels),
+    reason_label  = factor(reason_label, levels = lop_components),
+    weighted_days = .data[[weight_col]] * days_reason
+  ) %>%
+  group_by(reason_label, days_reason, day_range) %>%
+  summarise(weighted_days = sum(weighted_days, na.rm = TRUE), .groups = "drop")
+
+g06_y_max <- max(g06_faceted_data$weighted_days, na.rm = TRUE)
+
+g06_lop_weighted_days_faceted_x31 <- g06_faceted_data %>%
+  ggplot(aes(x = days_reason, y = weighted_days, fill = day_range)) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  facet_wrap(
+    ~ reason_label,
+    nrow = 3,
+    ncol = 3,
+    labeller = as_labeller(facet_label_map_g05g06)
+  ) +
+  scale_x_continuous(
+    limits = c(1, 31),
+    breaks = c(1, 5, 10, 15, 20, 25, 31),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    limits = c(0, g06_y_max),
+    labels = scales::label_comma(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  scale_fill_manual(values = day_range_colours) +
+  labs(
+    title    = "G06 (§4.2): Reason-specific weighted days contributed (x <= 31)",
+    subtitle = "Respondents with >=1 day absent per reason; Total facet removed; fixed x and y ranges",
+    x        = "Days absent (reason-specific; capped at 31)",
+    y        = "Weighted days contributed (sum of weight x days)",
+    fill     = "Day range",
+    caption  = "Source: CCHS 2010-11 & 2013-14 pooled analytical sample"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+ggsave(paste0(prints_folder, "g06_lop_weighted_days_faceted_x31.png"),
+       g06_lop_weighted_days_faceted_x31, width = 12, height = 9, dpi = 300)
+print(g06_lop_weighted_days_faceted_x31)
+
+
+# ---- SECTION: G1 Family - Reason Prevalence -----------------------------------
+# Framing question: What proportion of workers missed >=1 workday for each reason?
+# g1: weighted prevalence bar | g11: prevalence by survey cycle
 
 # ---- g1-data-prep ------------------------------------------------------------
 g1_data <- ds_lop_long %>%
@@ -499,13 +780,9 @@ ggsave(paste0(prints_folder, "g11_lop_prevalence_by_cycle.png"),
 print(g11_lop_prevalence_by_cycle)
 
 
-# =============================================================================
-# G2 FAMILY — Component Contribution to the Total Outcome
-# Framing question: How much does each LOP reason contribute to the
-#   weighted mean of days_absent_total?
-# g2  : dot-strip lollipop — absolute weighted mean + % share label
-# g21 : stacked bar — relative share of each component in the component sum
-# =============================================================================
+# ---- SECTION: G2 Family - Component Contribution ------------------------------
+# Framing question: How much does each LOP reason contribute to the weighted mean?
+# g2: lollipop absolute mean | g21: stacked share bar
 
 # ---- g2-data-prep ------------------------------------------------------------
 g2_data <- ds_lop_long %>%
@@ -605,13 +882,9 @@ ggsave(paste0(prints_folder, "g21_lop_contribution_stacked.png"),
 print(g21_lop_contribution_stacked)
 
 
-# =============================================================================
-# G3 FAMILY — Co-occurrence of Reason Categories
-# Framing question: How many reasons does a typical respondent report
-#   simultaneously, and which reason pairs most frequently co-occur?
-# g3  : bar chart — distribution of reason-count per respondent (0, 1, 2, …)
-# g31 : tile heatmap — pairwise co-occurrence rates across 8 reason categories
-# =============================================================================
+# ---- SECTION: G3 Family - Reason Co-occurrence --------------------------------
+# Framing question: How many reasons does a respondent report simultaneously?
+# g3: reason-count bar | g31: pairwise co-occurrence heatmap
 
 # ---- g3-data-prep ------------------------------------------------------------
 # Per-respondent count of reason categories with ≥1 day
@@ -730,13 +1003,9 @@ ggsave(paste0(prints_folder, "g31_lop_cooccurrence.png"),
 print(g31_lop_cooccurrence)
 
 
-# =============================================================================
-# G4 FAMILY — Conditional Intensity: Days Produced Per Reason, Among Reporters
-# Framing question: Among workers who missed work for a given reason,
-#   how many days did that reason typically produce?
-# g4  : horizontal bar (weighted mean) + diamond (median) per reason, reporters only
-# g41 : distribution of days_absent_total (non-zeros, log y-scale)
-# =============================================================================
+# ---- SECTION: G4 Family - Conditional Intensity -------------------------------
+# Framing question: Among reporters of each reason, how many days did it produce?
+# g4: mean + median bar (reporters only) | g41: total distribution log-scale
 
 # ---- g4-data-prep ------------------------------------------------------------
 # Restrict to respondents who reported ≥1 day for each specific reason
@@ -818,13 +1087,9 @@ ggsave(paste0(prints_folder, "g41_total_distribution.png"),
 print(g41_total_distribution)
 
 
-# =============================================================================
-# G5 FAMILY — Chronic Condition's Structural Role Among Absent Workers
-# Framing question: Among workers who missed at least one day, how central
-#   is the chronic-condition component to the total?
-# g5  : three-group bar — no chronic / mixed / entirely chronic
-# g51 : bubble chart — days_absent_chronic vs days_absent_total (both > 0)
-# =============================================================================
+# ---- SECTION: G5 Family - Chronic Role ----------------------------------------
+# Framing question: Among absent workers, how central is the chronic component?
+# g5: three-group bar (none/mixed/entirely chronic) | g51: chronic vs total bubble
 
 # ---- g5-data-prep ------------------------------------------------------------
 g5_data <- ds0 %>%
@@ -944,14 +1209,9 @@ ggsave(paste0(prints_folder, "g51_chronic_vs_total.png"),
 print(g51_chronic_vs_total)
 
 
-# =============================================================================
-# G6 FAMILY — LOP Component Availability (Data Quality Validation)
-# Framing question: Are all 8 LOP components complete in the analytical
-#   sample, confirming that zeros are preserved and element-wise exclusion
-#   upstream eliminated only rows with genuine missingness?
-# g6  : 100% stacked bar — zero vs positive per component
-# g61 : lollipop — weighted mean raw days per component (population average)
-# =============================================================================
+# ---- SECTION: G6 Family - Data Quality ----------------------------------------
+# Framing question: Are all 8 LOP components complete and zeros preserved?
+# g6: zero vs positive stacked bar | g61: population mean lollipop | g62: completeness
 
 # ---- g6-data-prep ------------------------------------------------------------
 # Per-component: count of zeros, positives, and missing (should be 0 after exclusion)

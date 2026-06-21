@@ -30,6 +30,7 @@ library(dplyr)
 library(tidyr)
 library(scales)
 library(fs)
+library(kableExtra)
 requireNamespace("arrow")
 
 # ---- httpgd (VS Code interactive plots) ------------------------------------
@@ -171,6 +172,59 @@ data_context_distributions <- ds0 %>%
   select(reason_label, column, n_positive, pct_positive, mean_days, median_days) %>%
   arrange(desc(pct_positive))
 print(data_context_distributions)
+
+# ---- data-context-response-span -----------------------------------------------
+# Comprehensive LOP response span: raw counts for each LOP variable by day value
+lop_response_span <- tibble::tibble(day_value = 0:90)
+
+# Add counts for each LOP variable
+for (var in names(lop_components)) {
+  lop_response_span <- lop_response_span %>%
+    mutate(
+      !!var := sapply(day_value, function(d) sum(ds0[[var]] == d, na.rm = TRUE))
+    )
+}
+
+# Add days_absent_total
+lop_response_span <- lop_response_span %>%
+  mutate(
+    days_absent_total = sapply(day_value, function(d) sum(ds0$days_absent_total == d, na.rm = TRUE))
+  ) %>%
+  # Filter to rows where at least one LOP variable has > 0 count
+  filter(if_any(!day_value, ~ . > 0)) %>%
+  # Reorder columns: Day first, then Total, then Chronic (lopg040), then other LOP vars
+  select(day_value, days_absent_total, lopg040, lopg070, lopg082, lopg083, lopg084, lopg085, lopg086, lopg100) %>%
+  # Rename columns with descriptive labels and LOP IDs
+  rename(
+    "Day" = day_value,
+    "Total\n(all components)" = days_absent_total,
+    "Chronic\n(lopg040)" = lopg040,
+    "Injury\n(lopg070)" = lopg070,
+    "Cold\n(lopg082)" = lopg082,
+    "Flu\n(lopg083)" = lopg083,
+    "Gastroenteritis\n(lopg084)" = lopg084,
+    "Respiratory Infection\n(lopg085)" = lopg085,
+    "Asthma/Bronchitis\n(lopg086)" = lopg086,
+    "Other Health\n(lopg100)" = lopg100
+  ) %>%
+  arrange(as.numeric(Day))
+
+# ---- lop-response-span-display ----------------------------------------------
+lop_response_span_html <- lop_response_span %>%
+  knitr::kable(
+    format = "html",
+    caption = "Empirical distribution of observed values in the outcome",
+    escape = FALSE,
+    align = c("c", "r", "r", "r", "r", "r", "r", "r", "r", "r")
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE
+  ) %>%
+  kableExtra::scroll_box(width = "100%") %>%
+  as.character()
+
+cat(lop_response_span_html)
 
 # ---- tweak-data-0 ------------------------------------------------------------
 # Long-form LOP dataset — shared ancestor for all graph families in eda-71
@@ -468,7 +522,11 @@ g1_lop_freq_curves <- g1_data %>%
     ),
     x       = "Days absent (frequency bin)",
     y       = "Weighted % of respondents",
-    caption = "Bins are collapsed in the upper tail (6\u201310, 11\u201315, 16\u201330, 31+) to stabilize sparse counts and preserve cross-reason shape comparability. Source: CCHS 2010\u201311 & 2013\u201314 pooled analytical sample (n = 63,843)."
+    caption = paste(
+      "Bins are collapsed in the upper tail (6\u201310, 11\u201315, 16\u201330, 31+) to stabilize sparse counts and preserve cross-reason shape comparability.",
+      "Source: CCHS 2010\u201311 & 2013\u201314 pooled analytical sample (n = 63,843).",
+      sep = "\n"
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -590,6 +648,26 @@ g11_data <- bind_rows(g11_all_focal, g11_bench_all) %>%
   filter(!(facet_reason == "Chronic condition" & series == "Benchmark: chronic")) %>%
   filter(!(facet_reason == "Total outcome" & series == "Benchmark: total"))
 
+# Unweighted n of positive reporters per facet — annotated in each panel
+g11_n_labels <- ds_lop_long %>%
+  filter(!is.na(days_reason) & days_reason > 0) %>%
+  group_by(reason_label) %>%
+  summarise(n_pos = n(), .groups = "drop") %>%
+  transmute(
+    facet_reason = factor(reason_label, levels = c(lop_components, "Total outcome")),
+    n_label = paste0("n = ", scales::comma(n_pos))
+  )
+
+g11_n_total <- ds0 %>%
+  filter(days_absent_total > 0) %>%
+  summarise(n_pos = n()) %>%
+  transmute(
+    facet_reason = factor("Total outcome", levels = c(lop_components, "Total outcome")),
+    n_label = paste0("n = ", scales::comma(n_pos))
+  )
+
+g11_n_all <- bind_rows(g11_n_labels, g11_n_total)
+
 # ---- g11 ---------------------------------------------------------------------
 # Faceted overlay to inspect relative shape per LOP variable against benchmarks.
 g11_facet_shape_benchmarks <- g11_data %>%
@@ -607,6 +685,13 @@ g11_facet_shape_benchmarks <- g11_data %>%
   geom_point(
     data = dplyr::filter(g11_data, series == "Facet LOP variable"),
     size = 1.8, alpha = 0.9
+  ) +
+  geom_text(
+    data = g11_n_all,
+    aes(x = Inf, y = Inf, label = n_label),
+    inherit.aes = FALSE,
+    hjust = 1.1, vjust = 1.5,
+    size = 2.8, colour = "#555555"
   ) +
   facet_wrap(~ facet_reason, ncol = 3) +
   scale_y_continuous(
@@ -885,7 +970,7 @@ g2_positive_n <- sum(g2_chronic_binned_distribution$n_raw, na.rm = TRUE)
 
 g2_right_raw_distribution <- g2_right_raw_distribution +
   labs(
-    title = "Positive chronic-day distribution",
+    title = "G2: Positive chronic-day distribution",
     subtitle = paste0("n = ", scales::comma(g2_positive_n), " chronic reporters")
   )
 
@@ -979,7 +1064,7 @@ g21_right_weighted_distribution <- g2_chronic_binned_distribution %>%
 
 g21_right_weighted_distribution <- g21_right_weighted_distribution +
   labs(
-    title = "Weighted positive chronic-day distribution",
+    title = "G21: Weighted positive chronic-day distribution",
     subtitle = "Bars sum to 100% across chronic reporters"
   )
 
@@ -1154,7 +1239,7 @@ g22_top_right_raw_distribution <- g2_chronic_binned_distribution %>%
   ) +
   scale_fill_manual(values = g2_day_range_colours, name = "Day range") +
   labs(
-    title = "Chronic-absence distribution",
+    title = "G22: Chronic-absence distribution",
     subtitle = paste0("n = ", scales::comma(g2_positive_n), " with ≥1 chronic day"),
     x = "Chronic-absence days (numeric)",
     y = "Respondent count"
@@ -1203,7 +1288,7 @@ g22_bottom_right_other_distribution <- g22_bottom_plot_data %>%
   ) +
   scale_fill_manual(values = g22_other_day_range_colours, name = "Day range") +
   labs(
-    title = "Other-reason absence distribution",
+    title = "G22: Other-reason absence distribution",
     subtitle = paste0("Same cohort as top panel (n = ", scales::comma(sum(g22_other_binned_distribution$n_raw, na.rm = TRUE)), "); bars include the 0-day non-chronic bin"),
     x = "Other-reason absence days (numeric)",
     y = "Respondent count"
@@ -1242,6 +1327,152 @@ grid::grid.draw(g22_chronic_raw_split_distribution)
 ggsave(
   paste0(prints_folder, "g22_chronic_vs_other_raw_split_distribution.png"),
   g22_chronic_raw_split_distribution, width = 8.5, height = 7, dpi = 300
+)
+
+
+# ---- g23-data-prep -----------------------------------------------------------
+# g23 keeps g22 geometry but changes the lower-right panel to the "other-only" cohort:
+# respondents with >=1 non-chronic day and 0 chronic days (n = 15,211).
+g23_other_only_analysis <- ds0 %>%
+  transmute(
+    category = dplyr::case_when(
+      days_absent_total == 0 ~ "No missed days",
+      days_absent_chronic > 0 ~ ">=1 chronic day",
+      days_absent_chronic == 0 & days_absent_total > 0 ~ "Other-only missed day",
+      TRUE ~ NA_character_
+    ),
+    weight_value = .data[[weight_col]],
+    days_absent_chronic = as.integer(days_absent_chronic),
+    days_absent_total = as.integer(days_absent_total),
+    days_absent_other = as.integer(days_absent_total - days_absent_chronic)
+  ) %>%
+  filter(!is.na(category) & days_absent_chronic == 0 & days_absent_total > 0)
+
+g23_other_only_binned_distribution <- g23_other_only_analysis %>%
+  mutate(
+    day_range = dplyr::case_when(
+      days_absent_other == 1  ~ "1 day",
+      days_absent_other == 2  ~ "2 days",
+      days_absent_other == 3  ~ "3 days",
+      days_absent_other == 4  ~ "4 days",
+      days_absent_other == 5  ~ "5 days",
+      days_absent_other <= 10 ~ "6–10 days",
+      days_absent_other <= 15 ~ "11–15 days",
+      days_absent_other <= 30 ~ "16–30 days",
+      TRUE ~ "31+ days"
+    ),
+    day_range = factor(day_range, levels = bin_levels)
+  ) %>%
+  group_by(days_absent_other, day_range) %>%
+  summarise(
+    n_raw = dplyr::n(),
+    wt_sum = sum(weight_value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  tidyr::complete(
+    days_absent_other = seq(
+      1,
+      max(days_absent_other, na.rm = TRUE),
+      by = 1
+    ),
+    fill = list(n_raw = 0, wt_sum = 0)
+  ) %>%
+  mutate(
+    day_range = dplyr::case_when(
+      days_absent_other == 1  ~ "1 day",
+      days_absent_other == 2  ~ "2 days",
+      days_absent_other == 3  ~ "3 days",
+      days_absent_other == 4  ~ "4 days",
+      days_absent_other == 5  ~ "5 days",
+      days_absent_other <= 10 ~ "6–10 days",
+      days_absent_other <= 15 ~ "11–15 days",
+      days_absent_other <= 30 ~ "16–30 days",
+      TRUE ~ "31+ days"
+    ),
+    day_range = factor(day_range, levels = bin_levels)
+  )
+
+g23_other_x_min <- 0
+g23_other_x_max <- max(g23_other_only_binned_distribution$days_absent_other, na.rm = TRUE)
+g23_other_x_major_breaks <- sort(unique(c(
+  0,
+  1,
+  seq(5 * ceiling(g23_other_x_min / 5), 5 * floor(g23_other_x_max / 5), by = 5)
+)))
+g23_other_x_major_breaks <- sort(unique(c(g23_other_x_major_breaks, g23_other_x_max)))
+g23_other_x_minor_breaks <- seq(g23_other_x_min, g23_other_x_max, by = 1)
+g23_other_x_ten_guides <- seq(10 * ceiling(g23_other_x_min / 10), 10 * floor(g23_other_x_max / 10), by = 10)
+
+g23_bottom_y_max <- max(g23_other_only_binned_distribution$n_raw, na.rm = TRUE)
+g23_bottom_y_limits <- c(0, g23_bottom_y_max * 1.08)
+g23_bottom_y_breaks <- pretty(g23_bottom_y_limits, n = 6)
+
+# ---- g23 - bottom-right (other-only non-chronic days) ------------------------
+g23_bottom_right_other_only_distribution <- g23_other_only_binned_distribution %>%
+  ggplot(aes(x = days_absent_other, y = n_raw, fill = day_range)) +
+  geom_vline(
+    xintercept = g23_other_x_ten_guides,
+    colour = "#D9D9D9",
+    linewidth = 0.35
+  ) +
+  geom_col(width = 0.9, alpha = 0.90) +
+  geom_col(
+    data = ~ dplyr::filter(.x, days_absent_other == 1),
+    width = 0.9, colour = "black", fill = NA, alpha = 0.5
+  ) +
+  scale_x_continuous(
+    breaks = g23_other_x_major_breaks,
+    minor_breaks = g23_other_x_minor_breaks,
+    limits = c(g23_other_x_min, g23_other_x_max + 1),
+    expand = expansion(mult = c(0.01, 0.02))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    breaks = g23_bottom_y_breaks,
+    limits = g23_bottom_y_limits,
+    expand = expansion(mult = c(0, 0))
+  ) +
+  scale_fill_manual(values = g2_day_range_colours, name = "Day range") +
+  labs(
+    title = "G23: Other-only non-chronic distribution",
+    subtitle = paste0(
+      "n = ", scales::comma(sum(g23_other_only_binned_distribution$n_raw, na.rm = TRUE)),
+      " with 0 chronic day and ",
+      "≥1 non-chronic day"
+    ),
+    x = "Other-reason absence days (numeric)",
+    y = "Respondent count"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_line(colour = "#ECECEC", linewidth = 0.20),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(size = 8),
+    legend.position = c(0.985, 0.985),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "#FFFFFFDD", colour = "#D0D0D0"),
+    legend.key.size = grid::unit(0.28, "cm"),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 6),
+    plot.margin = margin(2.75, 5.5, 5.5, 6)
+  ) +
+  guides(fill = guide_legend(ncol = 1, byrow = TRUE))
+
+# ---- g23 ---------------------------------------------------------------------
+g23_chronic_vs_other_only_split_distribution <- compose_three_panel_grob(
+  g2_left_raw_bar,
+  g22_top_right_raw_distribution,
+  g23_bottom_right_other_only_distribution,
+  left_width = 0.22,
+  right_width = 0.78
+)
+
+grid::grid.draw(g23_chronic_vs_other_only_split_distribution)
+
+ggsave(
+  paste0(prints_folder, "g23_chronic_vs_other_only_raw_split_distribution.png"),
+  g23_chronic_vs_other_only_split_distribution, width = 8.5, height = 7, dpi = 300
 )
 
 
@@ -1460,22 +1691,110 @@ if (isTRUE(getOption("knitr.in.progress"))) {
 
 # ---- g32 ---------------------------------------------------------------------
 # g32: ECDF overlays (positive part only, y > 0) in faceted panels.
+# Three reference lines per facet:
+#   Empirical  — orange solid (actual data)
+#   Gaussian   — purple dashed (same mean/SD, continuous)
+#   Poisson    — teal dotted (lambda = mean of raw positive part; x-grid transformed per scale)
 # Informs model specification for the conditional distribution among chronic reporters.
+
+# Gaussian reference parameters per scale
+g32_gauss_params <- g32_transform_data %>%
+  group_by(scale_label) %>%
+  summarise(
+    mu = mean(value, na.rm = TRUE),
+    sigma = sd(value, na.rm = TRUE),
+    min_val = min(value, na.rm = TRUE),
+    max_val = max(value, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Gaussian ECDF reference curves
+g32_gauss_ecdf <- g32_gauss_params %>%
+  rowwise() %>%
+  mutate(
+    x_grid  = list(seq(min_val, max_val, length.out = 300)),
+    cdf_grid = list(pnorm(x_grid, mean = mu, sd = sigma))
+  ) %>%
+  unnest(cols = c(x_grid, cdf_grid)) %>%
+  ungroup() %>%
+  mutate(series = "Gaussian")
+
+# Poisson reference: lambda = mean of raw positive-part days_absent_chronic.
+# For each scale, compute ppois() on the raw integer grid then apply the
+# same transformation to the x values so the CDF is plotted on each panel's axis.
+g32_lambda <- mean(ds0$days_absent_chronic[ds0$days_absent_chronic > 0], na.rm = TRUE)
+g32_raw_x_max <- max(ds0$days_absent_chronic[ds0$days_absent_chronic > 0], na.rm = TRUE)
+
+g32_pois_ecdf <- tibble::tibble(
+  x_raw    = seq_len(g32_raw_x_max),
+  cdf_grid = ppois(x_raw, lambda = g32_lambda)
+) %>%
+  tidyr::crossing(
+    tibble::tibble(scale_label = levels(g32_transform_data$scale_label))
+  ) %>%
+  mutate(
+    x_grid = dplyr::case_when(
+      scale_label == "Raw count (y)"               ~ as.double(x_raw),
+      scale_label == "Square root: sqrt(y)"        ~ sqrt(x_raw),
+      scale_label == "Log-shift: log1p(y)"         ~ log1p(x_raw),
+      scale_label == "IHS: asinh(y)"               ~ asinh(x_raw),
+      scale_label == "Log (positive-part): log(y)" ~ log(x_raw)
+    ),
+    scale_label = factor(scale_label, levels = levels(g32_transform_data$scale_label)),
+    series = "Poisson"
+  ) %>%
+  select(scale_label, x_grid, cdf_grid, series)
+
+# Combine reference curves for a single geom_line call
+g32_ref_curves <- bind_rows(
+  g32_gauss_ecdf %>% select(scale_label, x_grid, cdf_grid, series),
+  g32_pois_ecdf
+)
+
+# Colour and linetype mappings
+g32_ref_colours   <- c("Empirical" = "#D55E00", "Gaussian" = "#7030A0", "Poisson" = "#009E73")
+g32_ref_linetypes <- c("Empirical" = "solid",   "Gaussian" = "dashed",  "Poisson" = "dotted")
+g32_ref_linewidths <- c("Empirical" = 0.9,       "Gaussian" = 0.5,       "Poisson" = 0.5)
+
+# Create the g32 plot
 g32_transform_ecdf <- g32_transform_data %>%
   ggplot(aes(x = value)) +
-  stat_ecdf(linewidth = 0.9, colour = "#D55E00") +
+  # Empirical ECDF
+  stat_ecdf(
+    aes(colour = "Empirical", linetype = "Empirical"),
+    linewidth = 0.9
+  ) +
+  # Gaussian + Poisson reference ECDFs
+  geom_line(
+    data = g32_ref_curves,
+    aes(x = x_grid, y = cdf_grid, colour = series, linetype = series),
+    linewidth = 0.5,
+    alpha = 0.90
+  ) +
+  scale_colour_manual(values = g32_ref_colours,   name = NULL) +
+  scale_linetype_manual(values = g32_ref_linetypes, name = NULL) +
   facet_wrap(~ scale_label, scales = "free_x", ncol = 2) +
   labs(
     title = "g32: Transformation diagnostics for days_absent_chronic (positive part, y > 0)",
-    subtitle = "Chronic reporters only (n = 3,626). Assesses normality and tail behavior for positive-part model.",
+    subtitle = paste0(
+      "Chronic reporters only (n = 3,626). ",
+      "Orange solid = empirical ECDF; purple dashed = Gaussian (same mean/SD); ",
+      "teal dotted = Poisson (\u03bb = ", sprintf("%.2f", g32_lambda), "). ",
+      "Closer overlap = better approximation."
+    ),
     x = "Outcome value on candidate scale",
     y = "Empirical cumulative proportion",
-    caption = "Positive-part perspective: evaluates conditional distribution among those with ≥1 chronic-absence day. Reduced skew and compressed upper tail support Gaussian-based conditional model (e.g., log-link GLM or linear model on log scale)."
+    caption = paste0(
+      "Poisson CDF uses lambda = mean of raw positive-part days; x-axis reflects the same transformation applied to each scale's panel. ",
+      "Where empirical lies between Gaussian and Poisson, neither model is a perfect fit. ",
+      "Where empirical tracks Gaussian most closely (log scale), a log-link or Gaussian model is most appropriate."
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
     strip.text = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
   )
 
 ggsave(
@@ -1534,7 +1853,7 @@ g33_density_vs_gaussian <- g32_transform_data %>%
     x = "Outcome value on candidate scale",
     y = "Density",
     caption = paste0(
-      "Blue dashed = N(mean, SD) fitted to positive-part data. ",
+      "Blue dashed = N(mean, SD) fitted to positive-part data.\n ",
       "Better overlap = mean/SD statistics are trustworthy for conditional modeling. Informs choice of log-link or power transformation."
     )
   ) +
@@ -1567,16 +1886,149 @@ print(g33_density_vs_gaussian)
 
 
 # =============================================================================
-# G4 FAMILY — Component Correlation Structure    [STUB]
-# Framing question: How correlated are the 8 LOP components, and what does
-#   this imply for using the total as a single model criterion?
-# g4: tile heatmap of pairwise Spearman correlations among 8 LOP components
+# G4 FAMILY — Individual Respondent Contribution to Chronic-Absence Burden
+# Framing question: How do individual respondents with chronic absences
+#   distribute in their weighted-day contribution to total population burden?
+# g41: frequency distribution of respondent-level weighted chronic days
+# g42: histogram of weighted days with burden decomposition
 # =============================================================================
 
 # ---- g4-data-prep ------------------------------------------------------------
-# TODO: compute pairwise Spearman correlations among 8 LOP component columns
+# Calculate individual respondent weighted contribution to chronic-absence burden.
+# weighted_days = days_absent_chronic * weight_col
+# This represents each respondent's population-level contribution to total burden.
 
-# ---- g4 ----------------------------------------------------------------------
-# TODO: correlation tile heatmap with magnitude labels
+g4_respondent_contribution <- ds0 %>%
+  transmute(
+    days_absent_chronic = as.integer(days_absent_chronic),
+    weight_value        = .data[[weight_col]],
+    weighted_days       = days_absent_chronic * weight_value,
+    is_chronic_reporter = days_absent_chronic > 0
+  ) %>%
+  filter(is_chronic_reporter)
+
+# Summary statistics for respondent-level weighted contribution
+g4_contribution_summary <- g4_respondent_contribution %>%
+  summarise(
+    n_respondents = n(),
+    sum_weighted_days = sum(weighted_days, na.rm = TRUE),
+    mean_weighted_days = mean(weighted_days, na.rm = TRUE),
+    median_weighted_days = median(weighted_days, na.rm = TRUE),
+    sd_weighted_days = sd(weighted_days, na.rm = TRUE),
+    min_weighted_days = min(weighted_days, na.rm = TRUE),
+    max_weighted_days = max(weighted_days, na.rm = TRUE),
+    q25_weighted_days = quantile(weighted_days, probs = 0.25, na.rm = TRUE),
+    q75_weighted_days = quantile(weighted_days, probs = 0.75, na.rm = TRUE),
+    p90_weighted_days = quantile(weighted_days, probs = 0.90, na.rm = TRUE),
+    p95_weighted_days = quantile(weighted_days, probs = 0.95, na.rm = TRUE),
+    p99_weighted_days = quantile(weighted_days, probs = 0.99, na.rm = TRUE)
+  )
+
+# Create weighted-day bins for frequency display
+# Bins selected to reveal distribution structure while maintaining stability
+g4_respondent_binned <- g4_respondent_contribution %>%
+  mutate(
+    weighted_day_bin = dplyr::case_when(
+      weighted_days < 1           ~ "< 1",
+      weighted_days < 2           ~ "1 to < 2",
+      weighted_days < 5           ~ "2 to < 5",
+      weighted_days < 10          ~ "5 to < 10",
+      weighted_days < 20          ~ "10 to < 20",
+      weighted_days < 50          ~ "20 to < 50",
+      weighted_days < 100         ~ "50 to < 100",
+      weighted_days < 200         ~ "100 to < 200",
+      TRUE                        ~ "200+"
+    ),
+    weighted_day_bin = factor(
+      weighted_day_bin,
+      levels = c("< 1", "1 to < 2", "2 to < 5", "5 to < 10", 
+                 "10 to < 20", "20 to < 50", "50 to < 100", 
+                 "100 to < 200", "200+")
+    )
+  )
+
+# Compute bin frequencies (count of respondents, not weighted)
+g4_bin_freq <- g4_respondent_binned %>%
+  group_by(weighted_day_bin) %>%
+  summarise(
+    n_respondents = n(),
+    wt_sum_days = sum(weighted_days, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    pct_respondents = n_respondents / sum(n_respondents) * 100,
+    pct_burden = wt_sum_days / sum(wt_sum_days) * 100,
+    cumsum_pct_respondents = cumsum(pct_respondents),
+    cumsum_pct_burden = cumsum(pct_burden)
+  )
+
+# ---- g41 ---------------------------------------------------------------------
+# g41: Frequency distribution of respondents by their weighted-day contribution.
+# Y-axis: count of respondents (sample perspective)
+# X-axis: weighted-day bins (individual contribution to population burden)
+# Caption: reveals concentration of burden — are respondents evenly distributed
+#   or is burden concentrated in small group of high-weight chronic reporters?
+
+g41_respondent_freq_by_burden <- g4_bin_freq %>%
+  ggplot(aes(x = weighted_day_bin, y = n_respondents, fill = weighted_day_bin)) +
+  geom_col(width = 0.8, alpha = 0.85, colour = "white", linewidth = 0.3) +
+  geom_text(
+    aes(label = paste0(scales::comma(n_respondents), "\n(", sprintf("%.1f%%", pct_respondents), ")")),
+    vjust = -0.2,
+    size = 3,
+    lineheight = 0.95
+  ) +
+  scale_y_continuous(
+    labels = scales::label_comma(),
+    expand = expansion(mult = c(0, 0.08))
+  ) +
+  scale_fill_brewer(palette = "YlOrRd", direction = 1, name = "Weighted-day bin") +
+  labs(
+    title = "G41: Respondent frequency by weighted-day contribution to chronic-absence burden",
+    subtitle = paste0(
+      "Respondents with ≥1 chronic-absence day (n = ", scales::comma(g4_contribution_summary$n_respondents),
+      "). Each respondent weighted by ", weight_col, "."
+    ),
+    x = "Individual weighted-day contribution",
+    y = "Number of respondents",
+    caption = paste0(
+      "Weighted days per respondent = days_absent_chronic × ", weight_col, ". ",
+      "Reveals whether chronic-absence burden is concentrated or distributed. ",
+      "Large right tail suggests few high-weight respondents drive majority of population burden."
+    )
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1),
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+ggsave(
+  paste0(prints_folder, "g41_respondent_freq_by_burden.png"),
+  g41_respondent_freq_by_burden, width = 8.5, height = 5.5, dpi = 300
+)
+print(g41_respondent_freq_by_burden)
+
+# Mini validation: print bin summary table for verification
+if (isTRUE(getOption("knitr.in.progress"))) {
+  g4_bin_display <- g4_bin_freq %>%
+    transmute(
+      `Weighted-day bin` = weighted_day_bin,
+      `Respondent count` = scales::comma(n_respondents),
+      `% of respondents` = sprintf("%.1f%%", pct_respondents),
+      `Total burden (weighted days)` = sprintf("%.0f", wt_sum_days),
+      `% of total burden` = sprintf("%.1f%%", pct_burden),
+      `Cumulative % burden` = sprintf("%.1f%%", cumsum_pct_burden)
+    )
+
+  knitr::kable(
+    g4_bin_display,
+    format = "html",
+    align = c("l", "r", "r", "r", "r", "r"),
+    caption = "G41 validation table: respondent frequency and burden contribution by weighted-day bin"
+  )
+}
 
 # nolint end
