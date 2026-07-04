@@ -16,7 +16,7 @@ active
 
 Decompose the primary outcome variable (`days_absent_total`) into its 8 constituent LOP
 reason categories, directly addressing Sections 4.1 (outcome construction) and 4.2
-(distributional statistics) of the statistical instructions. Examines prevalence of each
+(distributional statistics) of the Project Proposal. Examines prevalence of each
 reason category, relative contribution to the overall absent-day burden, co-occurrence
 patterns across reason pairs, conditional intensity among reporters, and the structural
 role of the chronic-condition component.

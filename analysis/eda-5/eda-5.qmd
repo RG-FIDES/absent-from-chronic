@@ -190,7 +190,7 @@ For complete data documentation, see the [Data Primer](../data-primer-1/univaria
 #| cache: true
 #| fig-width: 10
 #| fig-height: 3
-#| fig-cap: "G0: The analytical sample splits approximately 70/30 between workers with no missed days and those with ≥1 missed day — consistent with the zero-inflated structure described in Kermiche et al. (2025) and confirmed in the 2026-05-15 review session. Sample size used for plotting: n = 63,843 respondents."
+#| fig-cap: "G0: The analytical sample splits approximately 70/30 between workers with no missed days and those with ≥1 missed day — consistent with the zero-inflated structure described in the initial exploration of the data and confirmed in the 2026-05-15 review session. Sample size used for plotting: n = 63,843 respondents."
 print(g0_lop_zero_vs_nonzero)
 ```
 

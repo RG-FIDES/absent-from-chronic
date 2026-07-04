@@ -37,7 +37,7 @@ Sample exclusion was applied in the following order (see `sample_flow` table):
 > `flag_analytic_complete`) without excluding rows. They are not recorded in the
 > `sample_flow` table.
 
-Prior-analysis reference final n: **64,141** (Kermiche et al., 2025).
+Reference final n from the initial exploration of the data: **64,141**.
 Observed n: **63,843** — deviation of 298 rows (within the ±5,000 warning threshold).
 
 ## Survey Weights
@@ -64,7 +64,7 @@ days_absent_total = lopg040 + lopg070 + lopg082 + lopg083 +
                     lopg084 + lopg085 + lopg086 + lopg100
 ```
 
-**Prior-analysis reference** (Kermiche et al. 2025, Table 2):
+**Reference from the initial exploration of the data** (Table 2):
 
 - Mean = 1.35 (SE = 0.02)
 - Zero proportion = 70.59%

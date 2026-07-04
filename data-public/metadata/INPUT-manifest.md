@@ -98,7 +98,7 @@ Both variables are in the `vars_inferred` (Tier 2) white-list in `2-ellis.R`.
 
 - **Population**: Canadian residents aged 15-75 who reported paid employment
   in the 3 months preceding the survey (LOP module respondents).
-- **Prior analysis n**: 64,141 (unweighted), pooled from both cycles.
-- **Study reference**: Kermiche T., Blanchette M.-A., Laprise C. (2025)
+- **Initial exploration n**: 64,141 (unweighted), pooled from both cycles.
+- **Study reference**: Blanchette M.-A., Koval O., Koval A. (2026)
   "Predictors of Work Absenteeism Associated with Chronic Conditions Among
-  Canadian Workers." Université de Montréal / UQTR.
+  Canadian Workers."

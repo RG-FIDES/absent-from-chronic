@@ -25,7 +25,7 @@ editor_options:
 This EDA profiles the 17 chronic-condition exposure variables (`cc_*`) that constitute
 the primary predictor domain in the Andersen Behavioral Model framework. It directly
 addresses §2.2 (primary exposure definition) and previews §4.3 (bivariate associations)
-from the statistical instructions.
+from the Project Proposal.
 
 **Research Questions:**
 
