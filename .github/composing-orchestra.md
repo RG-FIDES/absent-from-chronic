@@ -1,8 +1,24 @@
-# Composing Orchestra — Design Document v1
+# Composing Orchestra
 
-> **Status**: v1 — Initial design  
-> **Created**: 2026-03-19  
-> **Scope**: Single-agent system for bootstrapping and iteratively developing analytical reports (EDA or Presentation Report) in `./analysis/`
+**Version**: 1.1
+**Scope**: Single-agent specification for composing EDA, Report, and Data Primer assets in `analysis/`.
+
+## Orchestra Sitemap
+
+```text
+.github/
+├── composing-orchestra.md
+├── agents/
+│   └── report-composer.agent.md
+├── prompts/
+│   ├── composing-new.prompt.md
+│   └── talk-new.prompt.md
+├── instructions/
+│   ├── report-composition.instructions.md
+│   └── artifact-naming.instructions.md
+└── copilot/
+  └── composing-orchestra-SKILL.md
+```
 
 ---
 
@@ -15,12 +31,12 @@ The system recognizes three output types: **EDA**, **Report**, and **Data Primer
 ### Relationship to Publishing Orchestra
 
 | Concern | Composing Orchestra | Publishing Orchestra |
-|---------|---------------------|----------------------|
+| --- | --- | --- |
 | **Creates** | Raw analytical content in `analysis/` | Curated static website in `_frontend-N/` |
 | **Agent count** | 1 (Report Composer) | 2 (Interviewer + Writer) |
 | **Contract** | `report-contract.prompt.md` — structured brief | `publishing-contract.prompt.md` — page-level spec |
 | **Trigger** | Human says "compose eda-N" or "compose report-N" | Human says "publish frontend-N" |
-| **Output** | `.R` + `.qmd` pair + rendered HTML/PDF | `edited_content/` + `_site/` |
+| **Output** | `.R` + `.qmd` pair + rendered HTML/PDF | `content/` + `_site/` |
 
 The two systems are **complementary**: Composing creates content that Publishing later curates for a website. They share no artifacts and can operate independently.
 
@@ -64,7 +80,7 @@ The Data Context section is **analysis-specific** and lightweight. It orients th
 ### Two Modes
 
 | Aspect | EDA (Exploration Layer) | Report (Presentation Layer) |
-|--------|------------------------|-----------------------------|
+| --- | --- | --- |
 | **Goal** | Discover patterns with open mind | Synthesize evidence into narrative |
 | **Graph density** | 3–5 graph families, with exploration variants (g21, g22…) | Curated selection from upstream EDAs + new graphs |
 | **Narrative weight** | Light — annotations on what the graph shows | Heavy — guided story with evidence |
@@ -103,6 +119,7 @@ Triggered by the human (via `composing-new.prompt.md` or direct invocation of `@
 After scaffolding, the agent asks 3–5 focused questions to refine the contract. Questions are adaptive — each answer influences the next question.
 
 **Example question sequence for an EDA:**
+
 1. "What aspect of the data are you most curious about?" → establishes mission
 2. "Which Ellis tables are most relevant?" → narrows data sources
 3. "What comparisons or breakdowns would be most informative?" → suggests graph families
@@ -142,8 +159,8 @@ The agent and human collaborate to build the report:
 ### Framework Files (in `.github/`)
 
 | File | Purpose |
-|------|---------|
-| `composing-orchestra-1.md` | This design document |
+| --- | --- |
+| `composing-orchestra.md` | This design document |
 | `agents/report-composer.agent.md` | Agent definition |
 | `instructions/report-composition.instructions.md` | Stable rules for `analysis/**` |
 | `prompts/composing-new.prompt.md` | Bootstrap prompt |
@@ -156,7 +173,7 @@ The agent and human collaborate to build the report:
 ### Per-Report Files (in `analysis/eda-N/` or `analysis/report-N/`)
 
 | File | Purpose |
-|------|---------||
+| --- | --- |
 | `report-contract.prompt.md` | Structured brief for this report |
 | `{name}.R` | Analytical laboratory (includes data-context chunks) |
 | `{name}.qmd` | Publication layer (includes Data Context section) |
@@ -167,7 +184,7 @@ The agent and human collaborate to build the report:
 ### Data Primer Files (in `analysis/data-primer-1/`)
 
 | File | Purpose |
-|------|---------||
+| --- | --- |
 | `report-contract.prompt.md` | Structured brief for the data primer |
 | `data-primer-1.R` | Data profiling code |
 | `data-primer-1.qmd` | Canonical rendered knowledge base (standalone HTML) |
@@ -183,6 +200,7 @@ The agent and human collaborate to build the report:
 ### Graph Naming
 
 From `eda-style-guide.md`:
+
 - `g1`, `g2`, `g3`… — Individual graphs or family identifiers
 - `g21`, `g22`, `g23`… — Members of family g2 (sharing `g2-data-prep` ancestor)
 - `g2-data-prep` — Data preparation chunk for family g2
@@ -201,6 +219,7 @@ Reference `scripts/graphing/graph-presets.R` for `abcol`, `binary_colors`, `acru
 ### Data Provenance
 
 Every `ds*` and `g*` object must trace back to:
+
 - Ellis output (`data-private/derived/manipulation/*.parquet`) →
 - CACHE database tables (`data-public/metadata/CACHE-manifest.md`) →
 
@@ -264,5 +283,5 @@ The `report-composer` agent is **not** a persona in the `ai/personas/` system. I
 ## Version History
 
 | Version | Date | Changes |
-|---------|------|---------|
+| --- | --- | --- |
 | v1 | 2026-03-19 | Initial design |

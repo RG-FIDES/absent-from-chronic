@@ -211,7 +211,7 @@ without modifying anything (unless instructed to fix).
 | Prompt | `.github/prompts/pipeline-validate.prompt.md` | Phase 3 entry |
 | Prompt | `.github/prompts/pipeline-audit.prompt.md` | Phase 4 entry |
 | Instruction | `.github/instructions/pipeline-scripts.instructions.md` | Conventions for `manipulation/**` |
-| Design doc | `.github/pipeline-orchestra-1.md` | System architecture reference |
+| Design doc | `.github/pipeline-orchestra.md` | System architecture reference |
 
 ---
 

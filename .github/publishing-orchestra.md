@@ -1,6 +1,36 @@
-# Publishing Orchestra — Design v3
+# Publishing Orchestra
 
-**Status**: Current design reference (March 2026). Supersedes `publishing-orchestra-2.md`.
+**Version**: 4.0
+**Scope**: Two-agent specification for planning, assembling, and rendering curated Quarto frontends in `_frontend-*`.
+
+**Role of this document**: High-level, human-facing architecture and intent.
+**Operational source of truth**: `.github/instructions/publishing-rules.instructions.md` defines canonical term semantics and execution rules.
+
+## Orchestra Sitemap
+
+```text
+.github/
+├── publishing-orchestra.md
+├── agents/
+│   ├── publishing-interviewer.agent.md
+│   └── publishing-writer.agent.md
+├── prompts/
+│   ├── publishing-new.prompt.md
+│   └── publishing-validate.prompt.md
+├── instructions/
+│   └── publishing-rules.instructions.md
+├── templates/
+│   └── publishing-contract-template.md
+├── skills/
+│   └── publishing-fidelity-audit/
+│       └── SKILL.md
+└── copilot/
+    └── publishing-orchestra-SKILL.md
+```
+
+---
+
+**Status**: Current design reference (June 2026). Supersedes v3 terminology and protocol definitions.
 
 A two-agent system that transforms a reproducible analytics repository into a static Quarto website — with human editorial control at every state of rest.
 
@@ -12,7 +42,7 @@ A two-agent system that transforms a reproducible analytics repository into a st
 
 The central model: a three-state content lifecycle with a **probabilistic** first transition and a **deterministic** second.
 
-```
+```text
 RAW  ───prob───►  EDITED  ───det───►  PRINTED
 (repo)            (content/)           (_site/)
 ```
@@ -32,7 +62,7 @@ The rendered static website in `_frontend-N/_site/`. Output of `quarto render` a
 ### The Two Transitions
 
 | Transition | Nature | Agents | Explanation |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | RAW → EDITED | **Probabilistic** | Interviewer + Writer (iterative, human-guided) | Requires judgment: what to include, how to frame it, who reads it |
 | EDITED → PRINTED | **Deterministic** | `quarto render` | Mechanical: same `content/` + `_quarto.yml` → same `_site/` |
 
@@ -41,21 +71,21 @@ The rendered static website in `_frontend-N/_site/`. Output of `quarto render` a
 ## Two Agents
 
 | Agent | Role | Human-facing? | Analogy |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Interviewer** | Planning + human conversation. Reads human intent, scans repo, designs the edited site structure with protocol assignments, produces `publishing-contract.prompt.md`. | Yes | "What do you want to say?" |
-| **Writer** | Execution. Populates `edited_content/`, generates `_quarto.yml`, renders `_site/`. Guided by instruction rules. Non-conversational — reports results. | No | "Here's what you are saying, right?" |
+| **Writer** | Execution. Populates `content/`, generates `_quarto.yml`, renders `_site/`. Guided by instruction rules. Non-conversational — reports results. | No | "Here's what you are saying, right?" |
 
 ### Why this split
 
 - The **Interviewer** requires judgment: interpreting vague human intent, designing the edited site, deciding which protocol each page follows, writing Narrative Bridge briefs. It's conversational.
 - The **Writer** requires precision: copying files, authoring Narrative Bridge pages per instruction rules, resolving assets. It's procedural.
 - `publishing-contract.prompt.md` is the clean handoff: human-readable intent on one side, mechanical execution on the other.
-- If the Writer gets something wrong in `edited_content/`, you re-run *just the Writer* without redoing editorial planning.
+- If the Writer gets something wrong in `content/`, you re-run *just the Writer* without redoing editorial planning.
 
 ### What happened to v2's agents
 
-| v2 Agent | v3 Fate | Rationale |
-|---|---|---|
+| v2 Agent | v4 Fate | Rationale |
+| --- | --- | --- |
 | Publishing Orchestrator | Absorbed into **Interviewer** | The Interviewer is the human-facing agent; state detection is a decision tree, not a separate entity |
 | Publishing PE | Absorbed into **Interviewer** Phase 1 | Repo scanning and intent elicitation are the Interviewer's first act |
 | Publishing Editor | Split: planning → **Interviewer**, assembly → **Writer** | Planning and assembly are conceptually distinct |
@@ -73,22 +103,20 @@ Phases denote movement between **states of rest** at which humans can inspect th
 
 ### Phase 0 — Human Intent
 
-**Gate**: Before the Interviewer can engage, the human must author:
+**Gate**: The human starts by chatting with the Interviewer. The Interviewer records the intent in:
 
+```text
+_frontend-N/README.md
 ```
-./analysis/frontend-N/initial.prompt.md
-```
 
-This file ships as a lightweight getting-started template. The Interviewer's first act is to verify it has been filled in — not just the default placeholder. If the file still contains only the template stub, the Interviewer stops and asks the human to complete it before proceeding.
+The per-frontend README is the canonical intent record for that frontend instance. It captures:
 
-`initial.prompt.md` captures the human's vision for this specific frontend: who the audience is, what the site should communicate, what content from the repository should appear, and what feeling a visitor should walk away with. It is the permanent starting record for this frontend's editorial intent.
+- audience and use case
+- message and desired tone
+- source priorities and exclusions
+- protocol preferences and transform constraints
 
-**Iteration rounds** produce delta files:
-
-- `frontend-N-1.prompt.md` — first refinements after seeing the initial contract
-- `frontend-N-2.prompt.md` — further adjustments
-- Each delta assumes prior prompts have been implemented. Deltas are additive, not replacements.
-- Kept as separate files to preserve the trajectory of evolving human thinking.
+Each Interviewer session appends a timestamped intent update section to preserve intent history in one place.
 
 ### Phase 1 — Interview
 
@@ -96,15 +124,14 @@ This file ships as a lightweight getting-started template. The Interviewer's fir
 
 **Inputs**:
 
-- `analysis/frontend-N/initial.prompt.md` — primary human intent (must be authored before Phase 1 begins)
-- `analysis/frontend-N/frontend-N-*.prompt.md` — delta rounds, read in order
+- `_frontend-N/README.md` — canonical intent record (created/updated by Interviewer from chat)
 - `.github/templates/publishing-contract-template.md` — default architecture scaffold
 - Repo contents — scanned for publishable material
 
 **Process**:
 
-1. Verify `initial.prompt.md` is authored (not the template stub). Stop and prompt the human if not.
-2. Read `initial.prompt.md` and any delta files in order.
+1. Ensure `_frontend-N/README.md` contains a current intent section derived from the active chat.
+2. Summarize intent back to the human before drafting or revising the contract.
 3. Scan the repo for publishable content. Assess **maturity**: does the repo have at least one EDA script beyond EDA-1 and at least one non-exploratory report? If not, warn the human before proceeding.
 4. Design the `content/` structure using the **Default Site Architecture** (see below) as the scaffold. Add optional sections (Story, Materials, Philosophy) based on human intent. When the human describes a talk, slideshow, or presentation, route it to the Story section.
 5. For each planned page, assign a protocol: Direct Line, Technical Bridge, or Narrative Bridge.
@@ -135,7 +162,7 @@ This file ships as a lightweight getting-started template. The Interviewer's fir
 
 **Output**: `_frontend-N/content/` — all pages and assets, organized by section.
 
-**Checkpoint**: Human can browse `edited_content/` to verify content before rendering.
+**Checkpoint**: Human can browse `content/` to verify content before rendering.
 
 ### Phase 3 — Printing
 
@@ -161,9 +188,11 @@ This file ships as a lightweight getting-started template. The Interviewer's fir
 
 ## Writing Protocols
 
-Protocols classify **pages in `edited_content/`**, not files in Raw. Each page in the edited site follows exactly one protocol. Raw files are source material — they may feed into one or more edited pages, each under a different protocol.
+Canonical taxonomy note: the designated source of truth for Protocol, Mode, and Output Type definitions, and their mapping, is `.github/instructions/publishing-rules.instructions.md` (Section "Taxonomy and Mapping Registry"). This section is architectural guidance and examples.
 
-The Interviewer's job in Phase 1 is to **design the edited site**: decide what pages will exist in `edited_content/`, assign each page a protocol, and identify which raw files serve as source material. For example, `README.md` might produce a Direct Line page in the Docs section and also serve as an input source for a Narrative Bridge landing page — two different edited pages, two different protocols, one raw file.
+Protocols classify **pages in `content/`**, not files in Raw. Each page in the edited site follows exactly one protocol. Raw files are source material — they may feed into one or more edited pages, each under a different protocol.
+
+The Interviewer's job in Phase 1 is to **design the edited site**: decide what pages will exist in `content/`, assign each page a protocol, and identify which raw files serve as source material. For example, `README.md` might produce a Direct Line page in the Docs section and also serve as an input source for a Narrative Bridge landing page — two different edited pages, two different protocols, one raw file.
 
 ### Protocol 1: Direct Line
 
@@ -204,12 +233,12 @@ For content that doesn't exist in the repo — or that synthesizes multiple sour
 ### Protocol Examples
 
 | Page | Protocol | Source → Action |
-|---|---|---|
+| --- | --- | --- |
 | `project/mission.qmd` | Direct Line (VERBATIM) | `ai/project/mission.md` → morph to .qmd, add frontmatter |
 | `project/method.qmd` | Direct Line (VERBATIM) | `ai/project/method.md` → morph to .qmd, add frontmatter |
 | `project/glossary.qmd` | Direct Line (VERBATIM) | `ai/project/glossary.md` → morph to .qmd, add frontmatter |
 | `pipeline/cache-manifest.qmd` | Direct Line (VERBATIM) | `data-public/metadata/CACHE-manifest.md` → morph to .qmd, add frontmatter |
-| `docs/publisher-notes.qmd` | Direct Line (VERBATIM) | `.github/publishing-orchestra-3.md` → morph to .qmd, add frontmatter |
+| `docs/publisher-notes.qmd` | Direct Line (VERBATIM) | `.github/publishing-orchestra.md` → morph to .qmd, add frontmatter |
 | `analysis/eda-2.qmd` | Direct Line (REDIRECTED) | Stub → redirects to `eda-2.html` |
 | `analysis/report-1.qmd` | Direct Line (REDIRECTED) | Stub → redirects to `report-1.html` |
 | `pipeline/pipeline.qmd` | Technical Bridge | `manipulation/pipeline.md` → mermaid shortcode, extension promoted, sanitized |
@@ -222,14 +251,14 @@ For content that doesn't exist in the repo — or that synthesizes multiple sour
 
 ### How Raw Files Can Feed Multiple Edited Pages
 
-A single raw file can appear as source material for multiple pages in `edited_content/`, each following a different protocol:
+A single raw file can appear as source material for multiple pages in `content/`, each following a different protocol:
 
 - `README.md` → feeds a **Direct Line** page in Docs section (displayed as-is for reference)
 - `README.md` → feeds a **Narrative Bridge** page `index.qmd` (used as source material for a composed landing page)
 - `manipulation/pipeline.md` → feeds a **Technical Bridge** page `pipeline/pipeline.qmd` (displayed with shortcode injection)
 - `manipulation/pipeline.md` → feeds a **Narrative Bridge** page `index.qmd` (pipeline diagram extracted for landing page)
 
-The protocol belongs to the **edited page**, not to the raw file. A raw file has no inherent protocol — it acquires one only when it becomes the source for a specific page in `edited_content/`.
+The protocol belongs to the **edited page**, not to the raw file. A raw file has no inherent protocol — it acquires one only when it becomes the source for a specific page in `content/`.
 
 ---
 
@@ -237,7 +266,7 @@ The protocol belongs to the **edited page**, not to the raw file. A raw file has
 
 Every frontend follows this standard architecture. The Interviewer uses it as a scaffold when producing the contract. Sections marked **mandatory** must be populated before publication — a frontend missing any of them is unlikely to be ready for an audience.
 
-The **index page** is the home page. It is present in `edited_content/` but absent from the navbar — it is the destination for the root URL.
+The **index page** is the home page. It is present in `content/` but absent from the navbar — it is the destination for the root URL.
 
 ### Mandatory Sections
 
@@ -246,7 +275,7 @@ The **index page** is the home page. It is present in `edited_content/` but abse
 Establishes the project's identity, purpose, and vocabulary. Populated from the `ai/project/` directory.
 
 | Page | Protocol | Default Source |
-|---|---|---|
+| --- | --- | --- |
 | Mission | Direct Line (VERBATIM) | `./ai/project/mission.md` |
 | Method | Direct Line (VERBATIM) | `./ai/project/method.md` |
 | Glossary | Direct Line (VERBATIM) | `./ai/project/glossary.md` |
@@ -257,7 +286,7 @@ Establishes the project's identity, purpose, and vocabulary. Populated from the 
 Explains the data pipeline to someone who did not build it. Calibrated to be accessible to casual analysts — technically honest, approachable enough to be useful.
 
 | Page | Protocol | Default Source |
-|---|---|---|
+| --- | --- | --- |
 | Pipeline Guide | Technical Bridge | `./manipulation/pipeline.md` — mermaid shortcode injection, sanitize developer noise; draws on `./README.md` for context |
 | Cache Manifest | Direct Line (VERBATIM) | `./data-public/metadata/CACHE-manifest.md` |
 
@@ -266,7 +295,7 @@ Explains the data pipeline to someone who did not build it. Calibrated to be acc
 The analytical products of the project. Minimum: one exploratory and one non-exploratory report with conclusions.
 
 | Page | Protocol | Default Source |
-|---|---|---|
+| --- | --- | --- |
 | EDA | Direct Line (REDIRECTED) | `./analysis/eda-2/eda-2.html` (or highest-numbered real EDA) |
 | Report | Direct Line (REDIRECTED) | `./analysis/report-1/report-1.html` |
 
@@ -277,17 +306,17 @@ The analytical products of the project. Minimum: one exploratory and one non-exp
 Meta-documentation: what the site is, how it was built, how to navigate it.
 
 | Page | Protocol | Default Source |
-|---|---|---|
+| --- | --- | --- |
 | README | Technical Bridge | `./README.md` — links rewritten, mermaid injected, images co-located |
 | Site Map | Narrative Bridge | Agent-authored from contract navigation structure |
-| Publisher Notes | Direct Line (VERBATIM) | `./.github/publishing-orchestra-3.md` |
+| Publisher Notes | Direct Line (VERBATIM) | `./.github/publishing-orchestra.md` |
 
 ### Optional Sections
 
 Add these based on human intent. The Interviewer proposes them when matching content exists in the repo.
 
 | Section | Use when | Typical content |
-|---|---|---|
+| --- | --- | --- |
 | **Story** | Human describes a talk, slideshow, or presentation | RevealJS slides, annotated narratives, workshop materials |
 | **Materials** | Supplementary resources not fitting Analysis | Guides, datasets, templates, reference docs |
 | **Philosophy** | Project has explicit philosophy documentation | Methodology essays, design rationale, epistemic notes |
@@ -324,6 +353,7 @@ The single contract file between human editorial intent and mechanical execution
 #### [Page Title]
 - **Protocol**: Direct Line (VERBATIM)
 - **Source**: ./ai/project/mission.md
+- **source_sha256**: [optional hash snapshot of Source at contract time]
 
 #### [Page Title]
 - **Protocol**: Narrative Bridge
@@ -340,6 +370,8 @@ The single contract file between human editorial intent and mechanical execution
 #### [Page Title]
 - **Protocol**: Technical Bridge
 - **Source**: ./README.md
+- **source_sha256**: [optional hash snapshot of Source at contract time]
+- **allowed_transforms**: [link_rewrite, shortcode_injection, sanitize, extension_promotion, frontmatter_add]
 - **Transforms**: Inject mermaid diagram via include, rewrite links for site context,
   strip developer build instructions, co-locate images
 
@@ -362,14 +394,15 @@ The single contract file between human editorial intent and mechanical execution
 - **Narrative Bridge briefs**: Structured fields (intent, goal, spirit, inputs) replace `<!-- TBD -->` comments
 - **Multiple roles acknowledged**: A source file can appear under multiple pages with different protocols
 - **Self-contained**: No separate `printer.prompt.md` — the Writer generates `_quarto.yml` directly from the contract
+- **Fidelity-ready metadata**: Optional `source_sha256` and `allowed_transforms` fields enable deterministic drift checks
 
 ---
 
 ## Pre/Post-Render Hooks
 
-V2 discovered hooks organically and treated them as workarounds. V3 gives them first-class status.
+V2 discovered hooks organically and treated them as workarounds. V4 gives them first-class status.
 
-**When hooks are needed**: When the self-containment rule has a legitimate exception — typically REDIRECTED pages whose HTML targets live outside `edited_content/`.
+**When hooks are needed**: When the self-containment rule has a legitimate exception — typically REDIRECTED pages whose HTML targets live outside `content/`.
 
 **How they work**:
 
@@ -380,7 +413,7 @@ V2 discovered hooks organically and treated them as workarounds. V3 gives them f
 **Established hook patterns** (from `_frontend-1`):
 
 | Script | Hook | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `prep-pipeline-qmd.R` | pre-render | Generates `pipeline.qmd` from `manipulation/pipeline.md`, injecting mermaid include |
 | `copy-analysis-html.R` | post-render | Copies redirect target HTMLs into `_site/`, mirrors README images |
 
@@ -390,19 +423,19 @@ V2 discovered hooks organically and treated them as workarounds. V3 gives them f
 
 ### Image Co-location
 
-Any image referenced in a page must be copied to a local `images/` or `assets/` directory within `edited_content/`. The Writer resolves all relative paths at assembly time so they work from their new location.
+Any image referenced in a page must be copied to a local `images/` or `assets/` directory within `content/`. The Writer resolves all relative paths at assembly time so they work from their new location.
 
 ### Broken Link Prevention
 
-The Writer must verify that every internal cross-reference in `edited_content/` resolves. If a link points to a file excluded by the contract, it must be converted to plain text or flagged in `BUILD_REPORT.md`.
+The Writer must verify that every internal cross-reference in `content/` resolves. If a link points to a file excluded by the contract, it must be converted to plain text or flagged in `BUILD_REPORT.md`.
 
 ### Asset Resolution Algorithm
 
-For every file copied into `edited_content/`:
+For every file copied into `content/`:
 
 1. **Scan** for all local asset references (markdown images, HTML images, Quarto includes)
 2. **Resolve** each relative path against the source file's original directory
-3. **Copy** the resolved file to a mirrored path under `edited_content/`
+3. **Copy** the resolved file to a mirrored path under `content/`
 4. **Do not rewrite** internal references — preserving relative path structure means copies resolve automatically
 5. **Recurse** if a copied asset itself references further assets
 
@@ -431,11 +464,41 @@ If the Writer encounters:
 - An unresolvable asset reference
 - Any issue that doesn't block the rest of assembly
 
-...it completes the rest of the assembly and appends a `BUILD_REPORT.md` to `edited_content/` highlighting the issues with suggested resolutions.
+...it completes the rest of the assembly and appends a `BUILD_REPORT.md` to `content/` highlighting the issues with suggested resolutions.
 
 ### Post-Render Reconciliation
 
 After rendering, verify that the number of `.html` files in `_site/` matches the number of intended pages in the contract. Report discrepancies.
+
+---
+
+## Validation Gates
+
+Publishing Orchestra v4 applies protocol-specific quality gates before a run is considered complete.
+
+### Required Artifacts
+
+- `_frontend-N/TRANSFORM_LOG.md` — required whenever at least one ADAPTED page exists
+- `_frontend-N/FIDELITY_REPORT.md` — required for all runs
+- `_frontend-N/scripts/audit-fidelity.R` — required for reproducible protocol validation
+- `.github/templates/audit-fidelity-template.R` — bootstrap template when per-frontend script is absent
+
+### Gate by Protocol
+
+- **Direct Line (VERBATIM)**: Deterministic body-equivalence check (ignoring frontmatter normalization)
+- **Direct Line (REDIRECTED)**: Deterministic redirect-target existence and `_site/` copy verification
+- **Technical Bridge (ADAPTED)**: Deterministic transform-whitelist check plus required transform log entries
+- **Narrative Bridge (COMPOSED)**: Brief-structure compliance and source-grounding checks; final language and appearance remain a human review checkpoint
+
+If any mandatory gate fails, the Writer marks the run as failed in `FIDELITY_REPORT.md` and surfaces actionable remediation steps.
+
+### Gate Execution Contract
+
+1. Writer runs `_frontend-N/scripts/audit-fidelity.R` after assembly and render reconciliation.
+2. Audit script writes `_frontend-N/FIDELITY_REPORT.md` with per-page and per-protocol statuses.
+3. Writer must not report success when report status is `fail`.
+4. If a page defines `source_sha256` and the current source hash differs, that page must be re-assembled and marked as updated in `FIDELITY_REPORT.md`.
+5. If a Technical Bridge page defines `allowed_transforms`, any transform outside that list is a fidelity failure.
 
 ---
 
@@ -444,10 +507,10 @@ After rendering, verify that the number of `.html` files in `_site/` matches the
 After reviewing `_site/`, the human can re-enter at multiple points:
 
 | Loop | Entry point | Re-runs from | When to use |
-|---|---|---|---|
-| **A — Re-plan** | Write `frontend-N-K.prompt.md` (delta) | Phase 1 | Structural changes: add sections, change audience, rethink navigation |
+| --- | --- | --- | --- |
+| **A — Re-plan** | Update `_frontend-N/README.md` intent section (or continue chat with Interviewer) | Phase 1 | Structural changes: add sections, change audience, rethink navigation |
 | **B — Re-assemble** | Edit `publishing-contract.prompt.md` | Phase 2 | Content changes: swap a protocol, adjust a brief, add/remove pages |
-| **C — Micro-edit** | Edit files in `edited_content/` directly | Phase 3 (render only) | Fine-tuning: fix a typo, adjust wording, tweak CSS |
+| **C — Micro-edit** | Edit files in `content/` directly | Phase 3 (render only) | Fine-tuning: fix a typo, adjust wording, tweak CSS |
 | **D — Conversational** | Talk to Interviewer agent in chat | Agent determines appropriate loop | Most common in practice |
 
 ---
@@ -456,9 +519,9 @@ After reviewing `_site/`, the human can re-enter at multiple points:
 
 ### Framework Files (7)
 
-```
+```text
 .github/
-├── publishing-orchestra-3.md                    ← Design doc (you are here)
+├── publishing-orchestra.md                    ← Design doc (you are here)
 ├── agents/
 │   ├── publishing-interviewer.agent.md          ← Interviewer (planning + conversation)
 │   └── publishing-writer.agent.md               ← Writer (assembly + rendering)
@@ -474,7 +537,7 @@ After reviewing `_site/`, the human can re-enter at multiple points:
 
 ### Historical Files (preserved, not active)
 
-```
+```text
 .github/
 ├── publishing-orchestra-1.md                    ← v1 design doc (archived)
 └── publishing-orchestra-2.md                    ← v2 design doc (archived)
@@ -482,16 +545,11 @@ After reviewing `_site/`, the human can re-enter at multiple points:
 
 ### Per-Frontend Workspace
 
-```
-analysis/frontend-N/                   DESIGN WORKSPACE (thinking space)
-├── initial.prompt.md                 ← Human-authored vision (mandatory gate)
-├── frontend-N-1.prompt.md            ← Round 1 delta (preserved)
-├── frontend-N-2.prompt.md            ← Round 2 delta (preserved)
-└── ...
-
+```text
 _frontend-N/                           EXECUTION WORKSPACE (agent workspace)
+├── README.md                         ← Canonical intent record (chat-derived; append-only sections)
 ├── publishing-contract.prompt.md     ← Confirmed contract (the one contract file)
-├── edited_content/                   ← All pages + assets (self-contained)
+├── content/                   ← All pages + assets (self-contained)
 │   ├── index.qmd                    ← Narrative Bridge (home page; not in navbar)
 │   ├── _pipeline-diagram.qmd        ← Shared partial (mermaid include)
 │   ├── project/
@@ -514,15 +572,17 @@ _frontend-N/                           EXECUTION WORKSPACE (agent workspace)
 ├── scripts/                          ← Pre/post-render hooks
 │   ├── prep-pipeline-qmd.R
 │   └── copy-analysis-html.R
+├── TRANSFORM_LOG.md                  ← Required for ADAPTED pages
+├── FIDELITY_REPORT.md                ← Protocol gate results (pass/warn/fail)
 ├── _quarto.yml                       ← Generated by Writer
 └── _site/                            ← Rendered website
 ```
 
 ### System Overview (ASCII)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      PUBLISHING ORCHESTRA v3                        │
+│                      PUBLISHING ORCHESTRA v4                        │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  Phase 0          Phase 1              Phase 2 + 3                  │
@@ -530,12 +590,12 @@ _frontend-N/                           EXECUTION WORKSPACE (agent workspace)
 │                                                                     │
 │  Human        ┌─► Interviewer ──┐   ┌─► Writer ──────────────┐     │
 │  writes       │   reads intent  │   │   assembles             │     │
-│  intent  ─────┘   scans repo    │   │   edited_content/       │     │
+│  intent  ─────┘   scans repo    │   │   content/       │     │
 │  prompts      │   interviews    │   │   generates _quarto.yml │     │
 │               │   human         │   │   runs quarto render    │     │
 │               │                 │   │                         │     │
 │               │   OUTPUT:       │   │   OUTPUT:               │     │
-│               │   publishing-   │   │   edited_content/       │     │
+│               │   publishing-   │   │   content/       │     │
 │               │   contract.     │   │   _quarto.yml           │     │
 │               │   prompt.md     │   │   _site/                │     │
 │               └────────┬────────┘   └────────────┬────────────┘     │
@@ -560,38 +620,40 @@ _frontend-N/                           EXECUTION WORKSPACE (agent workspace)
 │  .github/templates/publishing-contract-template.md                  │
 │  .github/copilot/publishing-orchestra-SKILL.md                      │
 │  .github/prompts/publishing-new.prompt.md                           │
-│  .github/publishing-orchestra-3.md  (this file)                     │
+│  .github/publishing-orchestra.md  (this file)                     │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## V2 → V3 Comparison
+## V3 → V4 Comparison
 
-| Aspect | V2 | V3 |
-|---|---|---|
+| Aspect | V3 | V4 |
+| --- | --- | --- |
 | Agents | 4 (Orchestrator, PE, Editor, Printer) | 2 (Interviewer, Writer) |
 | Framework files | 14 | 7 |
 | Contract files per frontend | 3 (`editor.prompt.md`, `printer.prompt.md`, `questions.prompt.md`) | 1 (`publishing-contract.prompt.md`) |
 | Intermediate build spec | `printer.prompt.md` (leaked, diverged) | None — `_quarto.yml` is the spec |
-| Content folder name | `content/` | `edited_content/` |
+| Content folder name | `content/` references remained in docs and agents | `content/` standardized across docs and agents |
 | Content organization | Implicit types on raw files (emerged organically) | 3 explicit protocols on edited pages: Direct Line, Technical Bridge, Narrative Bridge |
 | Composed page guidance | `<!-- TBD -->` comments | Structured briefs: intent, goal, spirit, inputs |
 | Classification target | Raw files labeled with types | Edited pages assigned protocols; raw files are just source material |
-| Human intent preservation | Single `initial.prompt.md` | `initial.prompt.md` (mandatory gate) + versioned deltas: `frontend-N-1.prompt.md`, `-2`... |
+| Human intent preservation | `analysis/frontend-N/initial.prompt.md` gate + delta prompt files | `_frontend-N/README.md` as canonical intent record, updated from chat each cycle |
 | Instruction files | 4 separate (`publishing-content`, `publishing-analysis`, `publishing-manipulation`, `publishing-index`) | 1 merged (`publishing-rules.instructions.md`) |
 | Pre/post-render hooks | Workarounds | First-class documented pattern |
-| Self-containment | Not enforced (needed post-render fixups) | Mandatory rule for `edited_content/` |
+| Self-containment | Not enforced (needed post-render fixups) | Mandatory rule for `content/` |
 | Workflow descriptions | Duplicated 5+ times across files | Single source of truth (this design doc) |
 | Error handling | `questions.prompt.md` (blocker → stop → route to human) | `BUILD_REPORT.md` (best attempt, flag issues) |
+| Protocol validation | Advisory reconciliation only | Mandatory protocol-specific gates with `FIDELITY_REPORT.md` |
+| ADAPTED governance | Transform intent implied in prose | Required `TRANSFORM_LOG.md` for auditable non-editorial transforms |
 
 ---
 
 ## Quick Reference
 
 | Task | What to do |
-|------|------------|
+| ------ | ------------ |
 | Start the publishing pipeline | `@publishing-interviewer` |
 | Bootstrap a new frontend workspace | `/publishing-new` |
 | Change what pages appear on the website | Edit `publishing-contract.prompt.md`, re-run Writer |
@@ -599,8 +661,8 @@ _frontend-N/                           EXECUTION WORKSPACE (agent workspace)
 | Add a second website for a different audience | `/publishing-new` — creates `_frontend-N/` with its own workspace |
 | Change how content is normalized | Edit `publishing-rules.instructions.md` |
 | Change the contract schema | Edit `publishing-contract-template.md` |
-| Fine-tune rendered pages | Edit files in `edited_content/` directly, re-run `quarto render` |
+| Fine-tune rendered pages | Edit files in `content/` directly, re-run `quarto render` |
 
 ---
 
-*This document is the single source of truth for Publishing Orchestra v3. All agents, instructions, and templates derive from and defer to it.*
+*This document is the single source of truth for PUBLISHING ORCHESTRA v4. All agents, instructions, and templates derive from and defer to it.*

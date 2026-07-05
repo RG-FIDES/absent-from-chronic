@@ -1,105 +1,78 @@
 ---
 description: >
-  Phase 2 of the Pipeline Orchestra. Guides iterative development of the Ellis transformation
-  script from ferry staging output. Covers white-listing, factor recoding, outcome construction,
-  sample exclusions, and survey weight handling.
+  Phase 2 of the Pipeline Orchestra. Guides iterative development of Ellis transformation lanes
+  from Ferry output into analysis-ready tables or files.
 agent: Pipeline Engineer
 ---
 
-# Pipeline Ellis — Transformation Development
+# Pipeline Ellis
 
-Develop or refine the Ellis transformation script. This is Phase 2 of the Pipeline Orchestra.
+Develop or refine Ellis transformation lanes. This is Phase 2 of the Pipeline Orchestra.
 
 ## When to Use
 
-- Ferry output exists and you are ready to build transformation logic
-- Research requirements have changed and Ellis needs updating
-- New variables need to be added to the white-list
-- Factor recoding or exclusion criteria need adjustment
+- Ferry output exists and transformation logic needs to be implemented
+- Project requirements changed and Ellis needs revision
+- A new analytical rectangle or intermediate Ellis table is required
+- Existing Ellis logic needs better documentation or validation checkpoints
 
 ## Prerequisites
 
-- `manipulation/1-ferry.R` has been run successfully
-- Staging database exists (e.g., `cchs-1.sqlite`)
-- Codebook CSVs are available from `0-extract-metadata.R`
+- At least one numbered Ferry lane exists and has been run successfully
+- `manipulation/pipeline-project-spec.md` identifies the current Ellis sequence
+- The project-specific helper surfaces, if any, are documented locally in `manipulation/`
 
 ## Process
 
 ### Step 1: Read Context
 
-1. Read `.github/pipeline-orchestra-1.md` for system architecture
-2. Read `config.yml` for database paths
-3. Read existing `manipulation/2-ellis.R` if it exists
-4. Read `data-public/metadata/INPUT-manifest.md` for variable inventory
-5. Read codebook CSVs in `data-private/derived/` for value label mappings
-6. Read `scripts/templates/ellis-lane.R` and `scripts/templates/ellis.R` for templates
+1. Read `.github/pipeline-orchestra.md`.
+2. Read `manipulation/README.md`.
+3. Read `manipulation/pipeline-project-spec.md`.
+4. Read existing numbered Ellis lanes in `manipulation/`.
+5. Read `data-public/metadata/CACHE-manifest.md` if it exists.
+6. Read any local helper files the existing Ellis lanes depend on.
+7. Read the relevant templates in `scripts/templates/`.
 
 ### Step 2: Interview
 
-Ask adaptive questions based on what already exists:
+Ask adaptive questions based on what already exists.
 
-**If starting from scratch**:
+Typical questions:
 
-1. "What variables does the research require?" — Point to requirements document. Classify
-   into CONFIRMED (essential, hard error if missing) and INFERRED (expected, graceful drop).
-2. "What outcome variable(s) need construction?" — Row-wise sums, composites, range caps,
-   NA handling strategy.
-3. "What exclusion criteria define the analytical sample?" — Age range, employment status,
-   proxy respondent filters, completeness requirements.
-4. "What factor recoding is needed?" — Map numeric CCHS codes to meaningful factor levels.
-   Reference codebook CSVs and PUMF documentation.
-5. "Are survey weights involved?" — Pooling adjustment, bootstrap weights, strata identifiers.
-
-**If refining existing Ellis**:
-
-1. "What needs to change?" — New variables, different exclusion criteria, corrected recoding.
-2. Read the existing script to understand current state.
-3. Propose specific modifications with rationale.
+1. Which entities and variables must survive into the analysis-ready output?
+2. What exclusions, joins, or interval rules define the analytical cohort?
+3. Which derivations belong in SQL versus R?
+4. Which output object is provisional and which one is canonical for documentation?
+5. What validation checkpoints would cheaply catch wrong joins or wrong row grain?
 
 ### Step 3: Scaffold or Refine Ellis Script
 
-Create or update `manipulation/2-ellis.R` with these required sections:
+Create or update the appropriate numbered Ellis lane.
 
-```text
-# ---- setup -------------------------------------------------------------------
-# ---- declare-globals ---------------------------------------------------------
-#   - Pipeline flags (configurable behavior switches)
-#   - White-list: CONFIRMED variables (hard error if missing)
-#   - White-list: INFERRED variables (warning if missing)
-#   - Cross-cycle alias resolution
-# ---- load-data ---------------------------------------------------------------
-#   - Connect to ferry staging database
-#   - Load and pool cycles
-#   - Apply white-list column selection
-# ---- tweak-data --------------------------------------------------------------
-#   - Outcome construction (row-wise operations, range validation)
-#   - Sample exclusion pipeline (tracked in sample_flow table)
-#   - Factor recoding (all variables, explicit level definitions)
-#   - Survey weight adjustment
-# ---- validate ----------------------------------------------------------------
-#   - Assertions on output structure, ranges, factor levels
-#   - Diagnostic summaries (weighted means, zero proportions, dispersion)
-# ---- save-to-disk ------------------------------------------------------------
-#   - Parquet (primary — preserves R factors)
-#   - SQLite (secondary — factors stored as character)
-#   - sample_flow table (exclusion audit trail)
-```
+Each Ellis lane should make these sections easy to identify:
+
+- setup and configuration
+- input loading
+- transformation logic
+- validation or diagnostic checks
+- output materialization
+
+The lane may target tables, views, files, or a combination, depending on the project contract in
+`manipulation/pipeline-project-spec.md`.
 
 ### Step 4: Document Inline
 
-Every transformation decision must be documented in comments:
+Document transformation decisions where the reasoning would otherwise be hard to recover.
 
-- Why a specific recode mapping was chosen
-- Source CCHS variable codes and their meanings
-- Cross-cycle label discrepancies and resolution
-- Range validation boundaries and what happens to out-of-range values
+Focus comments on:
+
+- why a join or exclusion exists
+- why a derived field is defined that way
+- what row grain the output represents
+- which downstream artifact depends on the result
 
 ### Step 5: Instruct Human
 
-Tell the human to:
-
-1. Run `Rscript manipulation/2-ellis.R`
-2. Inspect output: row counts, column names, factor levels, outcome distribution
-3. Report issues (unexpected NAs, wrong factor levels, missing variables)
-4. Iterate until output is satisfactory
-5. Proceed to Phase 3 (Validation) when Ellis output is stable
+Tell the human what to run, what output to inspect, and what evidence to report before moving to
+validation and documentation.

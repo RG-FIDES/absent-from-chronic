@@ -1,78 +1,72 @@
 ---
 description: >
-  Phase 1 of the Pipeline Orchestra. Guides discovery of raw data sources and scaffolding
-  of extract-metadata and ferry scripts. Produces initial INPUT-manifest.
+   Phase 1 of the Pipeline Orchestra. Guides discovery of raw source systems and scaffolding of
+   Ferry lanes that transport data into project staging. Produces or refreshes INPUT-manifest.
 agent: Pipeline Engineer
 ---
 
-# Pipeline Bootstrap — Discovery + Ferry
+# Pipeline Bootstrap
 
-Bootstrap a new data pipeline from raw source files. This is Phase 1 of the Pipeline Orchestra.
+Bootstrap or refine a project pipeline from raw source systems. This is Phase 1 of the Pipeline
+Orchestra.
 
 ## When to Use
 
-- Raw data files have just arrived and no pipeline scripts exist yet
-- A new data source is being added to an existing pipeline
-- The ferry script needs to be rebuilt for changed source files
+- A project has no Ferry lane yet
+- A new source must be added to an existing pipeline
+- The source contract changed and Ferry needs redesign
+- The INPUT manifest is missing or stale
 
 ## Process
 
 ### Step 1: Read Context
 
-1. Read `.github/pipeline-orchestra-1.md` for system architecture
-2. Read `config.yml` for current file path configuration
-3. Read `scripts/templates/ferry-to-cache.R` for the ferry template
-4. Check if `manipulation/0-extract-metadata.R` and `manipulation/1-ferry.R` already exist
-5. If they exist, read them and ask: "These scripts already exist. Should I update them or
-   start fresh?"
+1. Read `.github/pipeline-orchestra.md`.
+2. Read `manipulation/README.md`.
+3. Read `manipulation/pipeline-project-spec.md`.
+4. Read `manipulation/pipeline.md` if it exists.
+5. Read `config.yml` for available DSNs and path conventions.
+6. Read `scripts/templates/ferry-to-cache.R` when an R Ferry lane is appropriate.
+7. Discover existing numbered Ferry lanes in `manipulation/`.
+8. Read `data-public/metadata/INPUT-manifest.md` if it exists.
 
 ### Step 2: Interview
 
-Ask 3–5 adaptive questions (each answer shapes the next):
+Ask 3 to 5 adaptive questions based on what the project adapter files do not already answer.
 
-1. "What raw data files do you have?" — Establish paths, formats (`.sav`, `.csv`, etc.),
-   received dates. Check if `config.yml` already has paths configured.
-2. "What is the research question or requirements document?" — Locate the document that
-   specifies which variables are needed (e.g., `stats_instructions_v3.md`).
-3. "Are there multiple data sources to pool?" — Determine if cross-source harmonization is
-   needed (variable name differences, overlapping time periods).
-4. "Any known data quality issues?" — Encoding problems, missing files, confidentiality
-   suppressions.
+Typical questions:
 
-### Step 3: Scaffold Extract-Metadata Script
+1. Which source systems and objects must be transported?
+2. What DSN, credentials pattern, or file locations should the lane use?
+3. Should the Ferry output remain split by source or be unified?
+4. Are there transport constraints such as very wide tables, very large extracts, or incremental windows?
+5. What naming or versioning convention should the staged outputs follow?
 
-Create or update `manipulation/0-extract-metadata.R`:
+### Step 3: Scaffold Ferry Script
 
-- Read raw files with labels preserved (e.g., `haven::read_sav(path, user_na = TRUE)`)
-- Extract variable labels (`attr(col, "label")`) and value labels (`attr(col, "labels")`)
-- Write codebook CSVs to `data-private/derived/` (variable labels, value labels, cross-source diffs)
-- Follow `r-scripts.instructions.md` conventions (preamble, chunk markers)
+Create or update the appropriate numbered Ferry lane in `manipulation/`.
 
-### Step 4: Scaffold Ferry Script
+The lane should:
 
-Create or update `manipulation/1-ferry.R`:
+- declare its inputs and outputs
+- follow the Ferry Pattern constraints
+- use project configuration rather than hardcoded secrets
+- produce durable staging artifacts
+- emit at least one cheap validation checkpoint
 
-- **Ferry Pattern only**: `haven::read_sav()` → `haven::zap_labels()` → `janitor::clean_names()`
-  → `DBI::dbWriteTable()` to SQLite
-- Source file paths from `config.yml` — no hardcoded paths
-- Parquet backup alongside SQLite
-- Validate expected variables are present (from interview and requirements doc)
-- No column selection, no recoding, no filtering
+### Step 4: Draft INPUT-Manifest
 
-### Step 5: Draft INPUT-Manifest
+Create or update `data-public/metadata/INPUT-manifest.md` from actual source inspection.
 
-Create or update `data-public/metadata/INPUT-manifest.md`:
+Capture:
 
-- File inventory (paths, formats, row/column counts, received dates)
-- Variable tiers (CONFIRMED = essential; INFERRED = expected)
-- Known limitations and data quality notes
-- Pipeline flow diagram (source → ferry → staging)
+- source inventory
+- transport scope
+- expected keys or row grain
+- staging outputs created by Ferry
+- known limitations or access caveats
 
-### Step 6: Instruct Human
+### Step 5: Instruct Human
 
-Tell the human to:
-
-1. Run `Rscript manipulation/0-extract-metadata.R` and inspect codebook CSVs
-2. Run `Rscript manipulation/1-ferry.R` and inspect the staging SQLite
-3. Report any issues (missing variables, encoding problems, unexpected row counts)
-4. Proceed to Phase 2 (Ellis) when satisfied with the staging data
+Tell the human what to run, what artifact to inspect, and what to report back before moving to
+Ellis development.

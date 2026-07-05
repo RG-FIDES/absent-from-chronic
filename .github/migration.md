@@ -1,391 +1,269 @@
-# Orchestra Migration Guides
+# Orchestra Migration Whitelist
 
-How to lift orchestration systems from source repositories into a target repository that does not have them yet. Each section covers one orchestra — listing the exact files to copy, prerequisites, and steps to follow. An agent in the target repository can use this file as the authoritative import guide.
+This document is the authoritative **whitelist of project-agnostic files** in `.github/`
+that are safe to migrate into another repository. It exists so that a human or an agent
+lifting the AI-support system into a repository that is behind on its version can copy the
+right files — and only the right files — without dragging repo-specific logic along.
 
----
+The whitelist is expressed as file-tree maps. Anything **not** shown in a map below is
+either repo-specific (tied to this project's data, cohort, or schema) or a generated
+artifact, and must **not** be migrated. The maps are the source of truth: when the system
+changes, update the maps here rather than maintaining separate prose per file.
 
-## Publishing Orchestra — Migration Guide
+## How To Use This Whitelist
 
-How to lift the publishing orchestra from `caseload-forecast-demo` into another repository that does not have it yet.
+1. Start from the **Master Agnostic File Map** to see the full transferable set at a glance.
+2. Use a **per-orchestra map** when you want to migrate exactly one orchestra — the map
+   isolates every file that orchestra needs.
+3. Use the **Extra-Orchestral map** for cross-cutting files that belong to no single
+   orchestra (shared style rules, the writing coach, the talk scaffolder, and this guide).
+4. Copy files into the target repo's `.github/`, preserving the directory structure exactly.
+5. Apply the **Adaptation Notes** for each orchestra before running anything.
+6. Follow the **Shared Migration Procedure** to verify the agents load in VS Code.
 
----
+## Master Agnostic File Map
 
-### What You Are Migrating
-
-The publishing orchestra is a **two-agent system** (Interviewer + Writer) that turns an analytics repository into a static Quarto website. It lives entirely in `.github/` and works without touching any of the repo's existing code.
-
-**Files to copy** (7 files across `.github/`):
-
-```text
-.github/
-├── publishing-orchestra-3.md                   ← Design doc (read-only reference)
-├── agents/
-│   ├── publishing-interviewer.agent.md          ← Interviewer agent
-│   └── publishing-writer.agent.md               ← Writer agent
-├── instructions/
-│   └── publishing-rules.instructions.md         ← Writer rules (applyTo: _frontend-*/**)
-├── templates/
-│   └── publishing-contract-template.md          ← Contract schema
-├── copilot/
-│   └── publishing-orchestra-SKILL.md            ← Skill for discoverability
-└── prompts/
-    └── publishing-new.prompt.md                 ← Bootstrap new frontend
-```
-
----
-
-### Prerequisites in the Target Repo
-
-Before migrating, verify:
-
-- [ ] [Quarto](https://quarto.org/) is installed (`quarto --version`)
-- [ ] R is available (`Rscript --version`) — needed for post-render hooks
-- [ ] The target repo has at least one EDA report beyond EDA-1 (e.g., `analysis/eda-2/`)
-- [ ] The target repo has at least one non-exploratory report (e.g., `analysis/report-1/`)
-- [ ] VS Code with GitHub Copilot (agent mode) is available
-
----
-
-### Migration Steps
-
-#### Step 1 — Copy the framework files
-
-Copy all 7 files listed above from `caseload-forecast-demo/.github/` into the target repo's `.github/`. Preserve the directory structure exactly.
-
-```bash
-# From a workspace containing both repos, e.g.:
-cp -r caseload-forecast-demo/.github/agents target-repo/.github/
-cp -r caseload-forecast-demo/.github/instructions target-repo/.github/
-cp -r caseload-forecast-demo/.github/templates target-repo/.github/
-cp -r caseload-forecast-demo/.github/copilot target-repo/.github/
-cp -r caseload-forecast-demo/.github/prompts target-repo/.github/
-cp caseload-forecast-demo/.github/publishing-orchestra-3.md target-repo/.github/
-```
-
-Or on Windows (PowerShell):
-
-```powershell
-$src = "path\to\caseload-forecast-demo\.github"
-$dst = "path\to\target-repo\.github"
-Copy-Item "$src\publishing-orchestra-3.md" $dst
-Copy-Item "$src\agents" $dst -Recurse
-Copy-Item "$src\instructions" $dst -Recurse
-Copy-Item "$src\templates" $dst -Recurse
-Copy-Item "$src\copilot" $dst -Recurse
-Copy-Item "$src\prompts" $dst -Recurse
-```
-
-#### Step 2 — Verify VS Code picks up the agents
-
-Open the target repo in VS Code. In the Copilot chat panel, type `@` and confirm that **Publishing Interviewer** and **Publishing Writer** appear in the agent list.
-
-If they do not appear:
-
-- Check that `.github/agents/publishing-interviewer.agent.md` and `publishing-writer.agent.md` exist
-- Reload VS Code window (`Ctrl+Shift+P` → "Developer: Reload Window")
-
-#### Step 3 — Adapt `copilot-instructions.md` (if target repo has one)
-
-If the target repo has a `.github/copilot-instructions.md`, add a reference to the publishing orchestra so the default agent knows it exists:
-
-```markdown
-## Publishing Orchestra
-
-This repo includes a two-agent publishing system for generating static Quarto websites from analytics content.
-- **Interviewer** (`@publishing-interviewer`): Plans the site, produces the contract.
-- **Writer** (`@publishing-writer`): Assembles `edited_content/`, renders `_site/`.
-- Design doc: `.github/publishing-orchestra-3.md`
-- Migration guide: `.github/migration.md`
-```
-
-#### Step 4 — Adapt the `applyTo` pattern (if needed)
-
-The `publishing-rules.instructions.md` file has a frontmatter directive:
-
-```yaml
-applyTo: "_frontend-*/**"
-```
-
-This tells VS Code to apply the rules only to files in `_frontend-N/` folders. If the target repo uses a different naming convention for frontend workspaces (e.g., `_site-N/`), update the `applyTo` pattern to match.
-
-#### Step 5 — Create the first frontend
-
-Follow the standard workflow:
-
-1. Create `analysis/frontend-N/initial.prompt.md` — fill in your intent.
-2. Invoke `@publishing-interviewer` — it will scan the repo, interview you, and produce `_frontend-N/publishing-contract.prompt.md`.
-3. Review and confirm the contract.
-4. Invoke `@publishing-writer` — it will assemble `edited_content/`, generate `_quarto.yml`, and render `_site/`.
-
-Or use the bootstrap prompt if available:
-
-```text
-@publishing-interviewer #file:.github/prompts/publishing-new.prompt.md
-```
-
----
-
-### What Does NOT Transfer Automatically
-
-- **`ai/` directory**: The persona system, dynamic context builder, and project-specific AI config are repo-specific. Do not copy them unless the target repo has the same structure.
-- **`analysis/` content**: EDA and report files are repo-specific. The orchestra reads them from the target repo.
-- **`data-public/` manifests**: These are produced by the target repo's own pipeline.
-- **`llms.txt`**: Repo-specific LLM context file, if present.
-
----
-
-### Minimal Viable Target Repo Structure
-
-For the orchestra to function, the target repo needs:
-
-```text
-target-repo/
-├── .github/
-│   ├── publishing-orchestra-3.md
-│   ├── agents/
-│   │   ├── publishing-interviewer.agent.md
-│   │   └── publishing-writer.agent.md
-│   ├── instructions/
-│   │   └── publishing-rules.instructions.md
-│   ├── templates/
-│   │   └── publishing-contract-template.md
-│   ├── copilot/
-│   │   └── publishing-orchestra-SKILL.md
-│   └── prompts/
-│       └── publishing-new.prompt.md
-├── analysis/
-│   ├── eda-2/          ← Must exist (EDA beyond EDA-1)
-│   │   └── eda-2.html
-│   └── report-1/       ← Must exist (non-exploratory report)
-│       └── report-1.html
-└── README.md           ← Used by Interviewer for project context
-```
-
----
-
-### Publishing Orchestra Troubleshooting
-
-| Issue | Fix |
-| --- | --- |
-| Agents not visible in VS Code | Reload window; verify `.agent.md` files are in `.github/agents/` |
-| `publishing-rules` not applying | Check `applyTo` frontmatter matches `_frontend-*/**` pattern |
-| Interviewer refuses to proceed | Verify `analysis/eda-2/` and `analysis/report-1/` exist with rendered HTML |
-| Post-render hook fails | Verify R is on PATH; check paths in `scripts/copy-analysis-html.R` match your repo structure |
-| Mermaid diagram not rendering | Ensure `_quarto.yml` includes `format: html: mermaid: theme: neutral` |
-
----
-
-### Publishing Orchestra Version
-
-This migration guide is written against **Publishing Orchestra v3** (`publishing-orchestra-3.md`, March 2026).
-If you encounter a newer design doc in `caseload-forecast-demo/.github/`, check whether a newer migration guide supersedes this one.
-
----
-
-## Composing Orchestra — Migration Guide
-
-How to lift the composing orchestra from `sda-fiesta-29` into another repository that does not have it yet.
-
----
-
-### Composing Orchestra Assets
-
-The composing orchestra is a **single-agent system** (`@report-composer`) that scaffolds, interviews, and iteratively develops analytical EDA and Report files in `analysis/`. It lives entirely in `.github/` and works alongside any existing repo pipeline without touching it.
-
-**Files to copy** (9 files across `.github/`):
+Every file below is project-agnostic and is a migration target. Preserve the structure
+exactly when copying into the target repo.
 
 ```text
 .github/
-├── composing-orchestra-1.md                    ← Design doc (read-only reference)
+├── agent-architecture.md
+├── composing-orchestra.md
+├── migration.md
+├── pipeline-orchestra.md
+├── publishing-orchestra.md
 ├── agents/
-│   └── report-composer.agent.md                ← Composer agent
-├── instructions/
-│   └── report-composition.instructions.md      ← Stable rules (applyTo: analysis/**)
-├── templates/
-│   ├── composing-contract-template.md          ← Contract schema
-│   ├── composing-template.R                    ← Shared R template
-│   ├── composing-template.qmd                  ← Shared Quarto template
-│   └── data-primer-template.qmd                ← Data primer template
+│   ├── eloquence-writer.agent.md
+│   ├── pipeline-engineer.agent.md
+│   ├── publishing-interviewer.agent.md
+│   ├── publishing-writer.agent.md
+│   └── report-composer.agent.md
 ├── copilot/
-│   └── composing-orchestra-SKILL.md            ← Skill for discoverability
+│   ├── composing-orchestra-SKILL.md
+│   ├── pipeline-orchestra-SKILL.md
+│   └── publishing-orchestra-SKILL.md
+├── hooks/
+│   ├── ellis-validation-reminder.json
+│   ├── publishing-validation-reminder.json
+│   └── scripts/
+│       ├── check-ellis-validation.ps1
+│       └── check-publishing-validation.ps1
+├── instructions/
+│   ├── artifact-naming.instructions.md
+│   ├── markdown.instructions.md
+│   ├── pipeline-scripts.instructions.md
+│   ├── publishing-rules.instructions.md
+│   ├── qmd-documents.instructions.md
+│   ├── r-scripts.instructions.md
+│   └── report-composition.instructions.md
+├── prompts/
+│   ├── composing-new.prompt.md
+│   ├── pipeline-audit.prompt.md
+│   ├── pipeline-bootstrap.prompt.md
+│   ├── pipeline-diagram.prompt.md
+│   ├── pipeline-ellis.prompt.md
+│   ├── pipeline-validate.prompt.md
+│   ├── publishing-new.prompt.md
+│   ├── publishing-validate.prompt.md
+│   ├── publishing-write.prompt.md
+│   └── talk-new.prompt.md
+├── skills/
+│   ├── publishing-fidelity-audit/
+│   │   └── SKILL.md
+│   └── validate-cache-manifest/
+│       ├── SKILL.md
+│       ├── references/
+│       │   ├── extract-table-metadata.sql
+│       │   └── report-template.md
+│       └── scripts/
+│           └── validate-cache-manifest.R
+└── templates/
+    ├── audit-fidelity-template.R
+    ├── composing-contract-template.md
+    ├── composing-template.R
+    ├── composing-template.qmd
+    ├── data-primer-template.qmd
+    ├── pipeline-diagram-template.mmd
+    ├── publishing-contract-template.md
+    └── report-audit-checklist.md
+```
+
+## Per-Orchestra Maps
+
+Each map isolates the files needed to migrate one orchestra independently. A file may
+appear in only one orchestra map; shared and unaffiliated files live in the
+Extra-Orchestral map.
+
+### Pipeline Orchestra
+
+Single-agent system (`@pipeline-engineer`) for Ferry/Ellis pipeline development,
+validation, and audit.
+
+```text
+.github/
+├── pipeline-orchestra.md
+├── agents/
+│   └── pipeline-engineer.agent.md
+├── copilot/
+│   └── pipeline-orchestra-SKILL.md
+├── hooks/
+│   ├── ellis-validation-reminder.json
+│   └── scripts/
+│       └── check-ellis-validation.ps1
+├── instructions/
+│   └── pipeline-scripts.instructions.md
+├── prompts/
+│   ├── pipeline-audit.prompt.md
+│   ├── pipeline-bootstrap.prompt.md
+│   ├── pipeline-diagram.prompt.md
+│   ├── pipeline-ellis.prompt.md
+│   └── pipeline-validate.prompt.md
+├── skills/
+│   └── validate-cache-manifest/
+│       ├── SKILL.md
+│       ├── references/
+│       │   ├── extract-table-metadata.sql
+│       │   └── report-template.md
+│       └── scripts/
+│           └── validate-cache-manifest.R
+└── templates/
+    └── pipeline-diagram-template.mmd
+```
+
+**Adaptation notes:**
+
+- The framework is intentionally project-agnostic. All source systems, table names, and
+  lane sequences live in the target repo's `manipulation/`, not in these files.
+- `validate-cache-manifest` reads its target binding from
+  `manipulation/pipeline-validation.dcf`; that binding file is repo-specific and is
+  **not** migrated — create it fresh in the target repo.
+- `hooks/*.json` reminder paths may need adjustment to match the target repo layout.
+
+### Composing Orchestra
+
+Single-agent system (`@report-composer`) for scaffolding and developing EDA and Report
+content in `analysis/`.
+
+```text
+.github/
+├── composing-orchestra.md
+├── agents/
+│   └── report-composer.agent.md
+├── copilot/
+│   └── composing-orchestra-SKILL.md
+├── instructions/
+│   ├── artifact-naming.instructions.md
+│   └── report-composition.instructions.md
+├── prompts/
+│   └── composing-new.prompt.md
+└── templates/
+    ├── composing-contract-template.md
+    ├── composing-template.R
+    ├── composing-template.qmd
+    ├── data-primer-template.qmd
+    └── report-audit-checklist.md
+```
+
+**Adaptation notes:**
+
+- Update hard-coded data paths in `composing-template.R`, `composing-template.qmd`, and
+  `data-primer-template.qmd` to match the target repo's pipeline outputs (e.g. parquet
+  reader calls).
+- Compose `analysis/data-primer-1/` first in the target repo — it is data-specific and is
+  never migrated, only produced fresh.
+
+### Publishing Orchestra
+
+Two-agent system (`@publishing-interviewer` → `@publishing-writer`) for assembling a
+static Quarto website from analytical content in `_frontend-*`.
+
+```text
+.github/
+├── publishing-orchestra.md
+├── agents/
+│   ├── publishing-interviewer.agent.md
+│   └── publishing-writer.agent.md
+├── copilot/
+│   └── publishing-orchestra-SKILL.md
+├── hooks/
+│   ├── publishing-validation-reminder.json
+│   └── scripts/
+│       └── check-publishing-validation.ps1
+├── instructions/
+│   └── publishing-rules.instructions.md
+├── prompts/
+│   ├── publishing-new.prompt.md
+│   ├── publishing-validate.prompt.md
+│   └── publishing-write.prompt.md
+├── skills/
+│   └── publishing-fidelity-audit/
+│       └── SKILL.md
+└── templates/
+    ├── audit-fidelity-template.R
+    └── publishing-contract-template.md
+```
+
+**Adaptation notes:**
+
+- `publishing-rules.instructions.md` uses the `applyTo: "_frontend-*/**"` frontmatter
+  pattern. If the target repo uses a different frontend naming convention, update it.
+- `hooks/*.json` reminder paths may need adjustment to match the target repo layout.
+- Prerequisites: [Quarto](https://quarto.org/) and R installed; the target repo has at
+  least one EDA beyond EDA-1 and one non-exploratory report with rendered HTML.
+
+## Extra-Orchestral Map
+
+These files are project-agnostic but belong to **no single orchestra**. They are shared
+style rules, a general-purpose writing agent, a talk scaffolder, and the migration and
+architecture references themselves. Migrate them regardless of which orchestras you take.
+
+```text
+.github/
+├── agent-architecture.md
+├── migration.md
+├── agents/
+│   └── eloquence-writer.agent.md
+├── instructions/
+│   ├── markdown.instructions.md
+│   ├── qmd-documents.instructions.md
+│   └── r-scripts.instructions.md
 └── prompts/
-    └── composing-new.prompt.md                 ← Bootstrap new EDA / Report
+    └── talk-new.prompt.md
 ```
 
----
+**Adaptation notes:**
 
-### Composing Orchestra Prerequisites
+- `eloquence-writer.agent.md` is a self-contained rhetorical writing coach, but it reads
+  its knowledge base from `data-private/texts/eloquence/`. That corpus lives outside
+  `.github/` and is **not** part of this whitelist — provide it in the target repo for the
+  agent to function fully.
+- `agent-architecture.md` describes the generic three-orchestra model and namespace
+  ownership; adjust any repo-specific output paths it references after migration.
+- The `markdown`, `r-scripts`, and `qmd-documents` instructions are style rules that apply
+  repository-wide and support all three orchestras.
 
-Before migrating, verify:
+## Shared Migration Procedure
 
-- [ ] [Quarto](https://quarto.org/) is installed (`quarto --version`)
-- [ ] R is available (`Rscript --version`) with `tidyverse`, `arrow`, `ggplot2`, `scales`
-- [ ] The target repo has a data processing pipeline whose outputs live in a known location (e.g., parquet files from an Ellis lane)
-- [ ] VS Code with GitHub Copilot (agent mode) is available
-- [ ] `analysis/` directory exists (even if empty beyond EDA-1)
+1. **Copy** the files for the orchestras you want, preserving the `.github/` structure.
+   Always include the Extra-Orchestral map.
+2. **Verify agents load**: open the target repo in VS Code, type `@` in Copilot chat, and
+   confirm the migrated agents appear (e.g. **Pipeline Engineer**, **Report Composer**,
+   **Publishing Interviewer**, **Publishing Writer**). If not, reload the window.
+3. **Adapt paths**: apply the per-orchestra adaptation notes above (data paths, `applyTo`
+   patterns, validation bindings, hook paths).
+4. **Wire into instructions**: if the target repo has a `.github/copilot-instructions.md`,
+   add short references to each migrated orchestra so the default agent knows it exists.
+5. **Smoke-test**: run one bootstrap prompt per migrated orchestra to confirm the entry
+   points resolve.
 
----
+## What Is Deliberately Excluded
 
-### Composing Orchestra Steps
+Files in `.github/` that are **absent from every map above** are repo-specific and must
+not be migrated. Do not add them to a target repo without deliberate re-authoring for that
+repo's data and conventions.
 
-#### Step 1 — Copy the Composing Orchestra Files
+## Version
 
-Copy all 9 files listed above from `sda-fiesta-29/.github/` into the target repo's `.github/`. Preserve the directory structure exactly.
-
-```powershell
-$src = "path\to\sda-fiesta-29\.github"
-$dst = "path\to\target-repo\.github"
-
-Copy-Item "$src\composing-orchestra-1.md" $dst
-Copy-Item "$src\agents\report-composer.agent.md" "$dst\agents\"
-Copy-Item "$src\instructions\report-composition.instructions.md" "$dst\instructions\"
-Copy-Item "$src\templates\composing-contract-template.md" "$dst\templates\"
-Copy-Item "$src\templates\composing-template.R" "$dst\templates\"
-Copy-Item "$src\templates\composing-template.qmd" "$dst\templates\"
-Copy-Item "$src\templates\data-primer-template.qmd" "$dst\templates\"
-Copy-Item "$src\copilot\composing-orchestra-SKILL.md" "$dst\copilot\"
-Copy-Item "$src\prompts\composing-new.prompt.md" "$dst\prompts\"
-```
-
-Or on Unix/macOS:
-
-```bash
-src="path/to/sda-fiesta-29/.github"
-dst="path/to/target-repo/.github"
-cp "$src/composing-orchestra-1.md" "$dst/"
-cp "$src/agents/report-composer.agent.md" "$dst/agents/"
-cp "$src/instructions/report-composition.instructions.md" "$dst/instructions/"
-cp "$src/templates/composing-"* "$dst/templates/"
-cp "$src/templates/data-primer-template.qmd" "$dst/templates/"
-cp "$src/copilot/composing-orchestra-SKILL.md" "$dst/copilot/"
-cp "$src/prompts/composing-new.prompt.md" "$dst/prompts/"
-```
-
-#### Step 2 — Verify VS Code picks up the agent
-
-Open the target repo in VS Code. In the Copilot chat panel, type `@` and confirm that **Report Composer** appears in the agent list.
-
-If it does not appear:
-
-- Check that `.github/agents/report-composer.agent.md` exists
-- Reload VS Code window (`Ctrl+Shift+P` → "Developer: Reload Window")
-
-#### Step 3 — Update `copilot-instructions.md` (if target repo has one)
-
-If the target repo has a `.github/copilot-instructions.md`, add a reference to the composing orchestra so the default agent knows it exists:
-
-```markdown
-## Composing Orchestra
-
-This repo includes a single-agent system for bootstrapping and developing analytical reports (EDA or presentation Report) in `analysis/`.
-- **Report Composer** (`@report-composer`): Scaffolds directories, conducts adaptive interviews, iteratively develops .R + .qmd reports with a per-report Data Context section.
-- **Data Primer** (`analysis/data-primer-1/`): Centralized, human-verified data reference composed once via `@report-composer`. All EDAs and Reports link to it.
-- Design doc: `.github/composing-orchestra-1.md`
-- Bootstrap prompt: `.github/prompts/composing-new.prompt.md`
-- Instructions: `.github/instructions/report-composition.instructions.md` (applies to `analysis/**`)
-- Templates: `.github/templates/composing-*.{R,qmd,md}` + `data-primer-template.qmd`
-```
-
-#### Step 4 — Update data paths in the templates
-
-The templates reference parquet files via `arrow::read_parquet()` paths that are specific to `sda-fiesta-29`. Open the three template files and update any hard-coded paths to match the target repo's pipeline outputs:
-
-- `.github/templates/composing-template.R` — update the commented-out parquet paths under `# load-data`
-- `.github/templates/data-primer-template.qmd` — update the Data Assets Inventory code chunks that scan parquet files
-
-If the target repo uses a different data format (e.g., `.csv`, `.rds`), replace the `arrow::read_parquet()` calls with the appropriate reader.
-
-#### Step 5 — Compose `data-primer-1` first
-
-The data primer is the prerequisite for all new EDAs and Reports. Before composing any analysis, compose the centralized data reference:
-
-```text
-@report-composer let's compose data-primer-1
-```
-
-The agent will scaffold `analysis/data-primer-1/` using `data-primer-template.qmd`, interview you about which data tables to cover, and produce:
-
-```text
-analysis/data-primer-1/
-    report-contract.prompt.md     ← structured brief
-    data-primer-1.R               ← data profiling code
-    data-primer-1.qmd             ← renders to data-primer-1.html
-```
-
-Render and **review the output** before proceeding. The data primer is human-verified and treated as ground truth by all downstream EDAs.
-
-#### Step 6 — Start composing EDAs and Reports
-
-Once the data primer exists, invoke the bootstrap prompt for any new analysis:
-
-```text
-@report-composer #file:.github/prompts/composing-new.prompt.md
-```
-
-Or directly:
-
-```text
-@report-composer let's start a new EDA on [topic]
-```
-
-The agent will determine the next available `N`, scaffold `analysis/eda-N/`, conduct an adaptive interview, populate the Data Context section, and register a commented-out entry in `flow.R`.
-
----
-
-### What Stays in the Source Repo
-
-- **`ai/` directory**: The persona system, dynamic context builder, and project-specific AI config are repo-specific. Do not copy unless the target repo has the same structure.
-- **`analysis/` content**: Existing EDA and report files are repo-specific. The agent reads them from the target repo.
-- **`flow.R`**: The pipeline registration script is repo-specific. The agent will add entries to whatever `flow.R` exists in the target repo.
-- **`data-private/` and `data-public/`**: Data files are never migrated; only the templates that reference them.
-- **`analysis/data-primer-1/`**: Must be freshly composed in the target repo — it is data-specific, not template-specific.
-
----
-
-### Minimum Target Repo Setup
-
-For the composing orchestra to function, the target repo needs:
-
-```text
-target-repo/
-├── .github/
-│   ├── composing-orchestra-1.md
-│   ├── agents/
-│   │   └── report-composer.agent.md
-│   ├── instructions/
-│   │   └── report-composition.instructions.md
-│   ├── templates/
-│   │   ├── composing-contract-template.md
-│   │   ├── composing-template.R
-│   │   ├── composing-template.qmd
-│   │   └── data-primer-template.qmd
-│   ├── copilot/
-│   │   └── composing-orchestra-SKILL.md
-│   └── prompts/
-│       └── composing-new.prompt.md
-├── analysis/
-│   └── eda-1/          ← Style reference (mtcars scaffold); must exist but is never modified
-├── flow.R              ← Pipeline registration script (agent adds commented-out entries)
-└── README.md           ← Used by agent for project context
-```
-
----
-
-### Composing Orchestra Troubleshooting
-
-| Issue | Fix |
-| --- | --- |
-| `@report-composer` not visible in VS Code | Reload window; verify `.github/agents/report-composer.agent.md` exists |
-| `report-composition` instructions not applying | Check `applyTo: "analysis/**"` frontmatter in `report-composition.instructions.md` |
-| Agent cannot find parquet files | Update data paths in `composing-template.R` and `data-primer-template.qmd` to match target repo |
-| Agent warns "data primer not found" | Compose `analysis/data-primer-1/` first (Step 5 above) |
-| Quarto render fails on `read_chunk()` | Ensure the `.R` file path in `knitr::read_chunk()` is relative to the `.qmd` file's location |
-| Graphs appear but are unsized | Check `fig.width` / `fig.height` chunk options; default is 8.5 × 5.5 inches |
-| `flow.R` entries not added | Agent adds entries as comments — search for `# eda-N` in `flow.R` after scaffolding |
-
----
-
-### Composing Orchestra Version
-
-This migration guide is written against **Composing Orchestra v1** (`composing-orchestra-1.md`, March 2026).
-If you encounter a newer design doc in `sda-fiesta-29/.github/`, check whether a newer migration guide supersedes this one.
+Whitelist maintained against the live `.github/` layout as of 2026-07-04. When the
+orchestra file set changes, update the maps in this document in the same commit.

@@ -1,6 +1,6 @@
 #  Absent from Chronic
 
-[Preview of Results](https://absent-from-chronic-site.vercel.app/edited_content/index.html)
+[Preview of Results](https://absent-from-chronic-site.vercel.app/content/index.html)
 
 ## About This Project
 
@@ -178,8 +178,8 @@ Each personal could be customized by adding specific documents to the dynamic pa
 
 This repo includes a two-agent publishing system for generating static Quarto websites from analytics content.
 - **Interviewer** (`@publishing-interviewer`): Plans the site, produces the contract.
-- **Writer** (`@publishing-writer`): Assembles `edited_content/`, renders `_site/`.
-- Design doc: `.github/publishing-orchestra-3.md`
+- **Writer** (`@publishing-writer`): Assembles `content/`, renders `_site/`.
+- Design doc: `.github/publishing-orchestra.md`
 - Migration guide: `.github/migration.md`
 
 ## Composing Orchestra
@@ -187,7 +187,7 @@ This repo includes a two-agent publishing system for generating static Quarto we
 This repo includes a single-agent system for bootstrapping and developing analytical reports (EDA or presentation Report) in `analysis/`.
 - **Report Composer** (`@report-composer`): Scaffolds directories, conducts adaptive interviews, iteratively develops .R + .qmd reports with a per-report Data Context section.
 - **Data Primer** (`analysis/data-primer-1/`): Centralized, human-verified data reference composed once via `@report-composer`. All EDAs and Reports link to it.
-- Design doc: `.github/composing-orchestra-1.md`
+- Design doc: `.github/composing-orchestra.md`
 - Bootstrap prompt: `.github/prompts/composing-new.prompt.md`
 - Instructions: `.github/instructions/report-composition.instructions.md` (applies to `analysis/**`)
 - Templates: `.github/templates/composing-*.{R,qmd,md}` + `data-primer-template.qmd`

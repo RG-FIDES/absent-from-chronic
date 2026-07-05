@@ -51,6 +51,7 @@ cat("Working directory: ", getwd())
 library(knitr)
 opts_knit$set(root.dir='../../') # keep this chunk isolated
 ```
+
 ```
 
 **Chunk 2** — global chunk options and `.R` script registration:
@@ -77,7 +78,6 @@ options(width = 100)
 ggplot2::theme_set(ggplot2::theme_minimal())
 read_chunk("analysis/{name}/{name}.R")
 ```
-```
 
 ## Empty-Body Pattern
 
@@ -85,7 +85,7 @@ All analytical chunks **must have empty bodies**. Code and `print()` live in the
 script; the `.qmd` chunk provides only `#|` options. Quarto executes the sourced R chunk code
 (including `print()`) automatically during rendering.
 
-```qmd
+````qmd
 ```{r g21}
 #| label: g21-performance-comparison
 #| code-summary: "Average performance by transmission type"
@@ -97,7 +97,7 @@ script; the `.qmd` chunk provides only `#|` options. Quarto executes the sourced
 #| fig-width: 8.5
 #| fig-height: 5.5
 ```
-```
+````
 
 ## Chunk Options
 
@@ -113,12 +113,18 @@ Key options:
 
 ## Standard Section Sequence
 
-```
+```text
+
 # Mission
+
 # Definition of Terms    ← environment chunks (load-packages, set_options)
+
 # Data Context           ← data-loading chunks + primer link
+
 # Analysis               ← graph and table chunks
+
 # Appendix               ← optional
+
 ```
 
 ## Data Context Section

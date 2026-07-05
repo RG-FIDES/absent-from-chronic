@@ -1,8 +1,8 @@
 ---
 description: >
   Structural and semantic rules for pipeline scripts in the manipulation/ directory.
-  Covers Ferry Pattern constraints, Ellis Pattern requirements, test script conventions,
-  metadata extraction patterns, and the relationship between scripts and companion documents.
+  Covers Ferry Pattern constraints, Ellis Pattern requirements, validation binding,
+  and the relationship between scripts and companion documents.
 applyTo: "manipulation/**"
 ---
 
@@ -10,81 +10,121 @@ applyTo: "manipulation/**"
 
 These rules supplement `r-scripts.instructions.md` with pipeline-specific conventions.
 
-## Script Numbering
+## Boundary Rule
 
-Pipeline scripts are numbered 0–3 for execution order:
+Files under `manipulation/` are project-specific. They may define local source systems, schemas,
+helper utilities, lane sequences, and validation bindings.
 
-- `0-extract-metadata.R` — Discovery (metadata harvesting)
-- `1-ferry.R` — Transport (zero-transformation import)
-- `2-ellis.R` — Transformation (white-list, recode, validate)
-- `3-test-ellis-cache.R` — Validation (three-way alignment test)
+Framework files under `.github/` must not hardcode those project details.
+
+## Script Naming
+
+Pipeline scripts use the general pattern `{order}-{lane}-{topic}.{ext}`.
+
+- **Order**: execution sequence number
+- **Lane**: `ferry` or `ellis`
+- **Topic**: project-defined purpose or entity
+- **Extension**: `.R` or `.sql`
+
+Examples:
+
+- `0-ferry-to-cache.R`
+- `1-ellis-event.R`
+- `2-ellis-interval.sql`
+
+Each project must provide at least one numbered Ferry lane and at least one numbered Ellis lane.
 
 ## Ferry Pattern Constraints
 
-Scripts following the Ferry Pattern (`1-ferry.R`):
+Ferry lanes transport source data into project staging with minimal semantic change.
 
-- **Allowed**: `haven::read_sav()`, `haven::zap_labels()`, `janitor::clean_names()`,
-  `DBI::dbWriteTable()`, `arrow::write_parquet()`
-- **Forbidden**: Column selection, variable renaming (beyond `clean_names()`), factor
-  recoding, row filtering, derived variables, business logic
-- **Configuration**: All file paths sourced from `config.yml`, never hardcoded
-- **Validation**: Confirm expected variables are present after import (do not filter them)
+Allowed by default:
+
+- source extraction via SQL, API, or file reads
+- technical filtering required for scope or volume control
+- column selection
+- technical normalization such as encoding fixes or safe column-name cleaning
+- writing durable staging artifacts
+
+Forbidden by default:
+
+- taxonomy application
+- analytical variable derivation
+- outcome construction
+- semantic recoding that changes meaning
+- business-rule filtering that belongs in Ellis
+
+If a Ferry lane intentionally performs a more opinionated operation, document the exception in
+`manipulation/pipeline-project-spec.md`.
 
 ## Ellis Pattern Requirements
 
-Scripts following the Ellis Pattern (`2-ellis.R`):
+Ellis lanes are responsible for transformation into analysis-ready outputs.
 
-- **White-list tiers**: Two-tier variable selection required
-  - CONFIRMED (Tier 1): Missing = `stop()` with informative message
-  - INFERRED (Tier 2): Missing = `warning()`, graceful drop
-- **Factor recoding**: Every categorical variable must have explicit level definitions.
-  Never rely on implicit ordering from the source data.
-- **CCHS special codes**: Map 6, 7, 8, 9, 96, 97, 98, 99 to `NA` for all factor variables.
-- **Outcome construction**: Document the formula, range validation, and NA handling strategy.
-- **Sample exclusion**: Track each exclusion step in a `sample_flow` table with columns:
-  `step`, `description`, `n_remaining`, `n_excluded`, `pct_remaining`.
-- **Inline documentation**: Every transformation decision must have a comment explaining
-  the rationale, referencing PUMF codebook codes where applicable.
-- **Cross-cycle harmonization**: Use an alias resolution block when pooling multiple survey
-  cycles with different variable names.
+Every Ellis lane should make these elements clear:
 
-## Test Script Conventions
+- declared inputs
+- declared outputs
+- transformation logic
+- validation checkpoints
+- how it fits the numbered lane sequence
 
-The test script (`3-test-ellis-cache.R`):
+Expected Ellis work may include:
 
-- **Four assertion sections**:
-  1. Artifact existence (files and directories)
-  2. Cross-format parity (SQLite ↔ Parquet row/column counts)
-  3. Data quality checks (ranges, factor levels, weights)
-  4. Sample flow validation (step count, monotonicity)
-- **Non-blocking in flow.R**: Always registered with `run_r_soft()` so failures warn but
-  do not halt the pipeline.
-- **Standalone executable**: Must also run correctly via `Rscript manipulation/3-test-ellis-cache.R`.
+- joins across staged datasets
+- taxonomy or factor recoding
+- derived variables
+- missing-value handling
+- materialization to project-defined targets
+- diagnostic summaries or assertions
 
-## Metadata Extraction Conventions
-
-The metadata extraction script (`0-extract-metadata.R`):
-
-- Read raw files with labels preserved (`haven::read_sav(path, user_na = TRUE)`)
-- Extract both variable labels and value labels
-- Write codebook CSVs to `data-private/derived/` (not `data-public/`)
-- Compare label sets across sources to detect cross-cycle discrepancies
+Project-specific helpers are allowed, but they must be documented locally in `manipulation/`.
 
 ## Companion Documents
 
-Pipeline scripts have three companion markdown documents that must stay synchronized:
+Pipeline scripts have companion markdown documents that must stay synchronized:
 
-- `data-public/metadata/INPUT-manifest.md` — documents what goes IN to the pipeline
-- `data-public/metadata/CACHE-manifest.md` — documents what comes OUT of Ellis
-- `manipulation/pipeline.md` — documents HOW to run the pipeline
+- `data-public/metadata/INPUT-manifest.md` — what enters the pipeline
+- `data-public/metadata/CACHE-manifest.md` — what the canonical analysis-ready output contains
+- `manipulation/pipeline-project-spec.md` — project-specific lane and artifact contract
+- `manipulation/pipeline-validation.dcf` — CACHE validation binding
+- `manipulation/pipeline.md` — execution guide and architecture diagram
 
-When modifying any pipeline script, consider whether the companion documents need updating.
+When modifying a lane script, consider whether one or more companion documents also needs updating.
+
+## Validation Binding
+
+The CACHE validation workflow must bind through `manipulation/pipeline-validation.dcf`.
+
+That file should provide, at minimum:
+
+- `dsn`
+- `database_label`
+- `target_object`
+- `target_label`
+- `manifest_path`
+- `report_path`
+
+Optional fields may provide an exclusion query or provenance query.
+
+## Mixed-Language Pipelines
+
+Mixed-language pipelines are supported.
+
+- Use `.R` for orchestration, file-based wrangling, or package-based transformations.
+- Use `.sql` for set-based transformations or database-native materialization.
+- Keep the numbered sequence explicit when switching languages.
 
 ## Registration in flow.R
 
-All pipeline scripts must be registered in the `ds_rail` tibble in `flow.R`:
+If the project uses `flow.R` or another orchestrator, keep the registered paths synchronized with
+the actual numbered lane files.
 
-- Phase 0 (metadata): `"run_r"` or `"run_r_soft"`
-- Phase 1 (ferry): `"run_r"`
-- Phase 2 (ellis): `"run_r"`
-- Phase 3 (test): `"run_r_soft"` (non-blocking)
+The framework does not require every pipeline to use `flow.R`, but if the project does, the
+registration should mirror the active lane sequence.
+
+## Diagnostic Output
+
+Diagnostic outputs may be written to prints folders or derived directories when useful.
+
+Keep the pattern consistent within the project and document it in `manipulation/pipeline.md`.

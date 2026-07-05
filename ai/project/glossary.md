@@ -58,7 +58,7 @@ Documentation file (`./data-public/metadata/INPUT-manifest.md`) describing raw i
 
 ### Pipeline Orchestra
 
-Single-agent automation system (`@pipeline-engineer`) that guides the development, validation, and maintenance of data pipeline scripts and their companion documentation. Operates in four phases: Discovery + Ferry, Ellis Development, Validation + Documentation, Quality Audit. Design document at `.github/pipeline-orchestra-1.md`.
+Single-agent automation system (`@pipeline-engineer`) that guides the development, validation, and maintenance of data pipeline scripts and their companion documentation. Operates in four phases: Discovery + Ferry, Ellis Development, Validation + Documentation, Quality Audit. Design document at `.github/pipeline-orchestra.md`.
 
 ### Pipeline Artifact
 
