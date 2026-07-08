@@ -59,6 +59,7 @@ exactly when copying into the target repo.
 │   └── report-composition.instructions.md
 ├── prompts/
 │   ├── composing-new.prompt.md
+│   ├── evaluate-harness-equivalence.prompt.md
 │   ├── pipeline-audit.prompt.md
 │   ├── pipeline-bootstrap.prompt.md
 │   ├── pipeline-diagram.prompt.md
@@ -69,6 +70,10 @@ exactly when copying into the target repo.
 │   ├── publishing-write.prompt.md
 │   └── talk-new.prompt.md
 ├── skills/
+│   ├── evaluate-harness-equivalence/
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   │       └── evaluate-harness-equivalence.ps1
 │   ├── publishing-fidelity-audit/
 │   │   └── SKILL.md
 │   └── validate-cache-manifest/
@@ -228,8 +233,14 @@ architecture references themselves. Migrate them regardless of which orchestras 
 │   ├── markdown.instructions.md
 │   ├── qmd-documents.instructions.md
 │   └── r-scripts.instructions.md
-└── prompts/
-    └── talk-new.prompt.md
+├── prompts/
+│   ├── evaluate-harness-equivalence.prompt.md
+│   └── talk-new.prompt.md
+└── skills/
+    └── evaluate-harness-equivalence/
+        ├── SKILL.md
+        └── scripts/
+            └── evaluate-harness-equivalence.ps1
 ```
 
 **Adaptation notes:**
@@ -256,6 +267,11 @@ architecture references themselves. Migrate them regardless of which orchestras 
    add short references to each migrated orchestra so the default agent knows it exists.
 5. **Smoke-test**: run one bootstrap prompt per migrated orchestra to confirm the entry
    points resolve.
+6. **Verify equivalence**: run the `evaluate-harness-equivalence` skill (or the
+   `/evaluate-harness-equivalence` prompt) against the source repo to confirm every
+   whitelisted file is byte-identical. It parses the maps in this document as its source of
+   truth and reports any drift with remediation suggestions. See
+   `.github/skills/evaluate-harness-equivalence/`.
 
 ## What Is Deliberately Excluded
 
@@ -265,5 +281,7 @@ repo's data and conventions.
 
 ## Version
 
-Whitelist maintained against the live `.github/` layout as of 2026-07-04. When the
-orchestra file set changes, update the maps in this document in the same commit.
+Whitelist maintained against the live `.github/` layout as of 2026-07-08. When the
+orchestra file set changes, update the maps in this document in the same commit — the
+`evaluate-harness-equivalence` skill reads these maps directly, so stale maps produce
+false drift reports.

@@ -1,6 +1,6 @@
 # Agent Architecture and Orchestration
 
-This document describes how AI agents coordinate across analytical workflows in sda-ceis-impact-dev.
+**This** document describes how AI agents coordinate across analytical workflows in the current local project.
 
 ## Three-Orchestra Model
 
@@ -216,6 +216,8 @@ Agents can be safely rerun without starting over:
 | `publishing-orchestra.md` | Publishing system design |
 | `.github/agents/report-composer.agent.md` | Composer role + capabilities |
 | `.github/instructions/artifact-naming.instructions.md` | Artifact ID system |
+| `.github/migration.md` | Whitelist of project-agnostic harness files |
+| `.github/skills/evaluate-harness-equivalence/SKILL.md` | Byte-equivalence audit of the agnostic harness vs. an upstream repo |
 
 ## Summary
 
@@ -228,3 +230,11 @@ The three-orchestra model ensures:
 - ✅ Failures are recoverable (manifests + explicit state)
 
 Each agent owns its namespace, reads shared references, maintains clear handoff points, and together form a cohesive analytical infrastructure.
+
+## Harness Integrity
+
+The project-agnostic surface of this harness is enumerated in `.github/migration.md`. To
+confirm a repository is in sync with the upstream support system, run the
+`evaluate-harness-equivalence` skill (or the `/evaluate-harness-equivalence` prompt): it
+byte-compares every whitelisted file against a reference repo and reports drift with
+remediation suggestions.

@@ -1,3 +1,4 @@
+# nolint start
 # AI agents must consult ./analysis/eda-1/eda-style-guide.md before making changes to this file.
 # Composing Orchestra template — customize all {PLACEHOLDERS} before use.
 # Mode: {TYPE} (EDA = explore with open mind | Report = synthesize prior findings)

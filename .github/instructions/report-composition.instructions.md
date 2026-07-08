@@ -143,8 +143,8 @@ Every EDA or Report `.qmd` must contain a **Data Context** section placed immedi
 
      ```
      This analysis uses:
-     - support_by_year.parquet: person-year of financial support (grain: person × year)
-     - client_roster.parquet: person-level demographics and program enrollment history
+     - primary_table.parquet: person-year records (grain: person × year)
+     - supporting_table.parquet: person-level demographics and enrollment history
      ```
 
 3. **`data-context-person` chunk**: Representative single-person view
@@ -155,8 +155,8 @@ Every EDA or Report `.qmd` must contain a **Data Context** section placed immedi
 
      ```
      example_person <- sample_dataset %>% slice_sample(n = 1) %>% pull(person_oid)
-     support_by_year %>% filter(person_oid == example_person)
-     client_roster %>% filter(person_oid == example_person)
+     primary_table %>% filter(person_oid == example_person)
+     supporting_table %>% filter(person_oid == example_person)
      ```
 
 4. **`data-context-distributions` chunk**: Distributions of variables appearing in this report's graphs
@@ -166,8 +166,8 @@ Every EDA or Report `.qmd` must contain a **Data Context** section placed immedi
    - Example:
 
      ```
-     support_by_year %>% count(program_class1) %>% arrange(desc(n))
-     client_roster %>% summarise(age_mean = mean(age), age_sd = sd(age))
+     primary_table %>% count(category) %>% arrange(desc(n))
+     supporting_table %>% summarise(age_mean = mean(age), age_sd = sd(age))
      ```
 
 ### Corresponding R Chunks
@@ -193,7 +193,7 @@ Include code in `data-context-person` or a supplementary validation chunk that c
 
 ```r
 # Verify grain: should be person × year with no duplicates
-support_by_year %>%
+primary_table %>%
   group_by(person_oid, year) %>%
   summarise(n = n(), .groups = "drop") %>%
   filter(n > 1) %>%
