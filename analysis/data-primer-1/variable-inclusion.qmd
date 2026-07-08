@@ -32,25 +32,13 @@ The following CONSORT-style diagram documents the sequential exclusion criteria 
 in `2-ellis.R` to produce the analytical sample. Each step records the number of
 respondents remaining and excluded.
 
-```{mermaid}
-flowchart TD
-    A["<b>Step 0: Full Pooled Sample</b><br/>CCHS 2010 + 2014 combined<br/><b>N = 126,431</b>"] --> B
-    B{"Age filter:<br/>DHHGAGE codes 2–15<br/>(ages 15–75)"} -->|Excluded: ~3,900| C
-    C["<b>Step 1: Age 15–75</b><br/><b>N ≈ 122,500</b>"] --> D
-    D{"Employment filter:<br/>LOP_015 = 1<br/>(worked past 3 months)"} -->|Excluded: ~58,200| E
-    E["<b>Step 2: Employed</b><br/><b>N ≈ 64,248</b>"] --> F
-    F{"Proxy filter:<br/>ADM_PRX ≠ 1<br/>(not proxy interview)"} -->|Excluded: 0| G
-    G["<b>Step 3: Non-Proxy</b><br/><b>N ≈ 64,248</b>"] --> H
-    H{"Outcome completeness:<br/>All 8 LOP day-counts<br/>non-missing (code ≠ 99)"} -->|Excluded: 405| I
-    I["<b>Step 4: Analytic Sample</b><br/><b>N = 63,843</b><br/>69 variables"]
-
-    style A fill:#e8f4fd,stroke:#2c7bb6
-    style I fill:#d4edda,stroke:#28a745
-    style B fill:#fff3cd,stroke:#ffc107
-    style D fill:#fff3cd,stroke:#ffc107
-    style F fill:#fff3cd,stroke:#ffc107
-    style H fill:#fff3cd,stroke:#ffc107
-```
+| Step | Criterion | n remaining | n excluded |
+|------|-----------|-------------|------------|
+| 0 | Full pooled sample (CCHS 2010 + 2014) | 126,431 | — |
+| 1 | Age filter: DHHGAGE codes 2–15 (ages 15–75) | ~122,500 | ~3,900 |
+| 2 | Employment filter: LOP_015 = 1 (worked past 3 months) | ~64,248 | ~58,200 |
+| 3 | Proxy filter: ADM_PRX != 1 (not proxy interview) | ~64,248 | 0 |
+| 4 | Outcome completeness: all 8 LOP day-count variables non-missing (code != 99) | 63,843 | 405 |
 
 > **Note:** Exact counts at steps 1–3 vary slightly by run depending on NA handling.
 > The final analytic n = 63,843 is stable. Zero proxy respondents were found in the
