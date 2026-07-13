@@ -1,6 +1,6 @@
 # Agent Architecture and Orchestration
 
-**This** document describes how AI agents coordinate across analytical workflows in the current local project.
+This document describes how AI agents coordinate across analytical workflows in the current local project.
 
 ## Three-Orchestra Model
 
