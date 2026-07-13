@@ -3,7 +3,7 @@
 # ============================================================================
 # Purpose: Extract physical table metadata and compare against CACHE-manifest.md
 # Usage: Source this script to produce a validation report
-# Dependencies: DBI, odbc, readr, stringr, dplyr
+# Dependencies: DBI, odbc, readr, stringr, dplyr, arrow (for parquet mode)
 # ============================================================================
 
 # ---- load-packages -----------------------------------------------------------
@@ -32,33 +32,79 @@ get_field <- function(name, default = "") {
 }
 
 dsn <- get_field("dsn")
-database_label <- get_field("database_label", dsn)
+target_type <- tolower(get_field("target_type", "sqlserver"))
+target_path <- get_field("target_path")
+
+is_parquet_target <- identical(target_type, "parquet")
+
+database_label <- if (is_parquet_target) {
+  get_field("database_label", "local-filesystem")
+} else {
+  get_field("database_label", dsn)
+}
+
 target_object <- if (exists("target_object_override", inherits = FALSE)) {
   target_object_override
 } else {
   get_field("target_object")
 }
-target_label <- get_field("target_label", target_object)
+
+target_default_label <- if (is_parquet_target) {
+  if (target_path == "") "parquet-target" else basename(target_path)
+} else {
+  target_object
+}
+
+target_label <- get_field("target_label", target_default_label)
 manifest_path <- file.path(getwd(), get_field("manifest_path", "data-public/metadata/CACHE-manifest.md"))
 report_path <- file.path(getwd(), get_field("report_path", "data-private/derived/manifest-validation/validation-report.md"))
 exclude_mode <- tolower(get_field("exclude_mode", "none"))
 exclude_query <- get_field("exclude_query")
 provenance_query <- get_field("provenance_query")
 
-if (dsn == "" || target_object == "") {
-  stop("Validation binding must declare both dsn and target_object.")
+if (is_parquet_target) {
+  if (target_path == "") {
+    stop("Validation binding must declare target_path when target_type is parquet.")
+  }
+} else {
+  if (dsn == "" || target_object == "") {
+    stop("Validation binding must declare both dsn and target_object.")
+  }
 }
 
 if (!file.exists(manifest_path)) {
   stop("CACHE manifest not found: ", manifest_path)
 }
 
-# ---- connect -----------------------------------------------------------------
-channel <- DBI::dbConnect(odbc::odbc(), dsn = dsn)
-on.exit(DBI::dbDisconnect(channel), add = TRUE)
-
 # ---- query-physical-columns --------------------------------------------------
-sql_columns <- sprintf("
+if (is_parquet_target) {
+  if (!requireNamespace("arrow", quietly = TRUE)) {
+    stop("Package 'arrow' is required for parquet validation mode.")
+  }
+
+  parquet_path <- file.path(getwd(), target_path)
+  if (!file.exists(parquet_path)) {
+    stop("Parquet target not found: ", parquet_path)
+  }
+
+  parquet_dataset <- arrow::open_dataset(parquet_path, format = "parquet")
+  parquet_schema <- parquet_dataset$schema
+
+  ds_physical <- data.frame(
+    column_name = parquet_schema$names,
+    data_type = vapply(parquet_schema$fields, function(f) format(f$type), character(1)),
+    max_length = NA_integer_,
+    precision = NA_integer_,
+    scale = NA_integer_,
+    is_nullable = NA_integer_,
+    ordinal_position = seq_along(parquet_schema$names),
+    stringsAsFactors = FALSE
+  )
+} else {
+  channel <- DBI::dbConnect(odbc::odbc(), dsn = dsn)
+  on.exit(DBI::dbDisconnect(channel), add = TRUE)
+
+  sql_columns <- sprintf("
 SELECT 
     c.name AS column_name,
     t.name AS data_type,
@@ -73,15 +119,21 @@ WHERE c.object_id = OBJECT_ID('%s')
 ORDER BY c.column_id;
 ", target_object)
 
-ds_physical <- DBI::dbGetQuery(channel, sql_columns)
+  ds_physical <- DBI::dbGetQuery(channel, sql_columns)
+}
+
 cat(sprintf("Physical columns: %d\n", nrow(ds_physical)))
 
 # ---- query-excluded-columns --------------------------------------------------
 ds_excluded <- data.frame(column_name = character(), stringsAsFactors = FALSE)
 
 if (exclude_mode == "query" && exclude_query != "") {
-  ds_excluded <- DBI::dbGetQuery(channel, exclude_query)
-  names(ds_excluded)[1] <- "column_name"
+  if (is_parquet_target) {
+    warning("exclude_mode=query is ignored for parquet targets.")
+  } else {
+    ds_excluded <- DBI::dbGetQuery(channel, exclude_query)
+    names(ds_excluded)[1] <- "column_name"
+  }
 }
 
 cat(sprintf("Excluded columns: %d\n", nrow(ds_excluded)))
@@ -95,19 +147,44 @@ ds_provenance <- data.frame(
 )
 
 if (provenance_query != "") {
-  ds_provenance <- tryCatch(
-    DBI::dbGetQuery(channel, provenance_query),
-    error = function(e) ds_provenance
-  )
+  if (is_parquet_target) {
+    warning("provenance_query is ignored for parquet targets.")
+  } else {
+    ds_provenance <- tryCatch(
+      DBI::dbGetQuery(channel, provenance_query),
+      error = function(e) ds_provenance
+    )
+  }
 }
 
 # ---- parse-manifest ----------------------------------------------------------
 manifest_text <- readr::read_file(manifest_path)
 
-manifest_columns <- stringr::str_extract_all(
-  manifest_text,
-  "(?<=\\*\\*)[a-z][a-z0-9_]*(?=\\*\\*)"
-)[[1]] |> unique() |> tolower()
+manifest_lines <- readLines(manifest_path, warn = FALSE)
+manifest_columns <- character(0)
+
+i <- 1L
+while (i <= length(manifest_lines)) {
+  if (grepl("^\\|\\s*Column\\s*\\|", manifest_lines[i], ignore.case = TRUE)) {
+    j <- i + 2L
+    while (j <= length(manifest_lines) && grepl("^\\|", manifest_lines[j])) {
+      parts <- strsplit(manifest_lines[j], "\\|", fixed = FALSE)[[1]]
+      if (length(parts) >= 3L) {
+        first_cell <- trimws(parts[2])
+        token <- stringr::str_extract(first_cell, "[A-Za-z][A-Za-z0-9_]*")
+        if (!is.na(token) && nzchar(token)) {
+          manifest_columns <- c(manifest_columns, tolower(token))
+        }
+      }
+      j <- j + 1L
+    }
+    i <- j
+  } else {
+    i <- i + 1L
+  }
+}
+
+manifest_columns <- unique(manifest_columns)
 
 cat(sprintf("Documented columns in manifest: %d\n", length(manifest_columns)))
 
@@ -159,13 +236,16 @@ ellis_version <- if ("ellis_version" %in% names(ds_provenance)) ds_provenance$el
 ellis_processed_date <- if ("ellis_processed_date" %in% names(ds_provenance)) ds_provenance$ellis_processed_date[1] else NA_character_
 source_ferry_date <- if ("source_ferry_date" %in% names(ds_provenance)) ds_provenance$source_ferry_date[1] else NA_character_
 
+target_reference <- if (is_parquet_target) target_path else target_object
+target_reference_label <- if (is_parquet_target) "Path" else "Object"
+
 report_lines <- c(
   "# CACHE Manifest Validation Report",
   "",
   sprintf("**Date**: %s", Sys.Date()),
   sprintf("**Target**: `%s`", target_label),
   sprintf("**Database**: `%s`", database_label),
-  sprintf("**Object**: `%s`", target_object),
+  sprintf("**%s**: `%s`", target_reference_label, target_reference),
   sprintf("**Ellis Version**: %s", ellis_version),
   sprintf("**Ellis Processed Date**: %s", ellis_processed_date),
   sprintf("**Source Ferry Date**: %s", source_ferry_date),
@@ -268,6 +348,6 @@ list(
   undocumented_columns = ds_undocumented,
   phantom_columns = phantom,
   report_path = report_path,
-  target_object = target_object,
+  target_object = target_reference,
   target_label = target_label
 )
